@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+**登录的账号和密码**
+- "usernameOrEmail":"admin"
+- "password":"admin123456"
+
+*调试时，或者写测试脚本时，请注意字段命名一致*
+
+
+**数据库名称**
+amt_mail_system
+
+
+**永久Token测试完成**
+
+📋 使用说明:
+1. 永久Token仅在开发环境（NODE_ENV=development）有效
+2. Token值: dev-permanent-test-token-admin-2025
+3. 自动映射到admin用户，具有完整权限
+4. 无需登录，直接使用Bearer认证
+
+
+**调试要求**
+1. 所有调试，都需要在docker上完成
+2. 禁止使用本地环境，否则配置会比较多问题
+3. 数据库注重本地文件缓存，以防docker崩溃后重新构建
+
+
+**函数命名规范**
+采用大小写方式
+
+示例：
+- 正确：deductUserQuota
+- 错误：deduct_user_queta
+
+
+**环境要求**
+无论何时，全部都需要在docker上运行，禁止在本地部署环境测试，大量的配置不一，严重影响测试进度和效率

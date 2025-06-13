@@ -1,0 +1,322 @@
+# 通用UAT测试与交付规范
+
+## 🚨 核心原则
+
+**本规范为强制性文档，任何UAT测试和交付必须严格遵守，不得简化或跳过任何步骤。**
+
+## 📋 第一部分：UAT前置条件检查清单
+
+### 1.1 环境清理检查 ✅
+
+**必须按顺序执行，全部通过才能继续：**
+
+```bash
+# 步骤1：强制清理所有进程
+sudo lsof -ti:${BACKEND_PORT},${FRONTEND_PORT},${TEST_PORT} | xargs kill -9 2>/dev/null || true
+pkill -f "${FRONTEND_PROCESS_PATTERN}|${BACKEND_PROCESS_PATTERN}" || true
+sleep 5
+
+# 步骤2：验证端口清空
+lsof -i:${BACKEND_PORT} && echo "❌ 后端端口未清理" && exit 1
+lsof -i:${FRONTEND_PORT} && echo "❌ 前端端口未清理" && exit 1
+echo "✅ 端口清理完成"
+
+# 步骤3：清理缓存
+cd ${FRONTEND_DIR} && rm -rf ${CACHE_DIRS}
+cd ${PROJECT_ROOT}
+echo "✅ 缓存清理完成"
+```
+
+### 1.2 技术架构一致性检查 ✅
+
+**验证技术栈配置统一性：**
+
+```bash
+# 检查1：前端必须是指定技术栈应用
+curl -s ${FRONTEND_URL} | grep -q "${FRONTEND_IDENTIFIER}" || echo "❌ 前端应用类型错误"
+
+# 检查2：后端必须是API服务
+curl -s ${BACKEND_HEALTH_URL} | jq .status | grep -q "ok" || echo "❌ 后端API异常"
+
+# 检查3：端口配置一致性检查
+grep -r "${FRONTEND_PORT}" ${FRONTEND_CONFIG} || echo "❌ 前端端口配置不一致"
+grep -r "${BACKEND_PORT}" ${BACKEND_CONFIG} || echo "❌ 后端端口配置不一致"
+```
+
+### 1.3 配置文件统一性验证 ✅
+
+**所有端口和URL配置必须从统一配置文件读取：**
+
+```javascript
+// 配置文件：${CONFIG_FILE}
+{
+  "development": {
+    "backend": ${BACKEND_PORT},
+    "frontend": ${FRONTEND_PORT},
+    "api_base": "${API_BASE_URL}"
+  },
+  "production": {
+    "backend": ${PROD_BACKEND_PORT},
+    "frontend": ${PROD_FRONTEND_PORT},
+    "api_base": "${PROD_API_BASE}"
+  }
+}
+```
+
+## 📋 第二部分：UAT执行标准
+
+### 2.1 启动服务标准 ✅
+
+**强制执行顺序，不得调整：**
+
+```bash
+# 1. 启动后端
+cd ${BACKEND_DIR} && ${BACKEND_START_CMD} &
+BACKEND_PID=$!
+echo "后端PID: $BACKEND_PID"
+
+# 2. 等待后端完全启动
+for i in {1..30}; do
+  curl -s ${BACKEND_HEALTH_URL} >/dev/null && break
+  echo "等待后端... ($i/30)"
+  sleep 2
+done
+
+# 3. 验证后端健康
+curl ${BACKEND_HEALTH_URL} | jq .status | grep -q "ok" || {
+  echo "❌ 后端启动失败"
+  kill $BACKEND_PID
+  exit 1
+}
+
+# 4. 启动前端
+cd ${FRONTEND_DIR} && ${FRONTEND_START_CMD} &
+FRONTEND_PID=$!
+echo "前端PID: $FRONTEND_PID"
+
+# 5. 等待前端完全启动
+for i in {1..60}; do
+  RESPONSE=$(curl -s ${FRONTEND_URL})
+  echo "$RESPONSE" | grep -q "${FRONTEND_IDENTIFIER}" && break
+  echo "等待前端... ($i/60)"
+  sleep 3
+done
+
+# 6. 验证前端为指定技术栈应用
+curl -s ${FRONTEND_URL} | grep -q "${FRONTEND_IDENTIFIER}" || {
+  echo "❌ 前端不是期望的技术栈"
+  kill $BACKEND_PID $FRONTEND_PID
+  exit 1
+}
+
+echo "✅ 服务启动验证通过"
+```
+
+### 2.2 API接口一致性验证 ✅
+
+**前后端字段命名必须完全一致：**
+
+```bash
+# 验证登录接口
+LOGIN_RESPONSE=$(curl -s -X POST ${LOGIN_API_URL} \
+  -H "Content-Type: application/json" \
+  -d "${LOGIN_PAYLOAD}")
+
+echo "$LOGIN_RESPONSE" | jq ${LOGIN_SUCCESS_FIELD} | grep -q true || {
+  echo "❌ 登录接口失败"
+  echo "响应: $LOGIN_RESPONSE"
+  exit 1
+}
+
+TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r ${TOKEN_FIELD})
+
+# 验证核心业务接口
+BUSINESS_RESPONSE=$(curl -s ${BUSINESS_API_URL} \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "$BUSINESS_RESPONSE" | jq ${BUSINESS_DATA_FIELD} || {
+  echo "❌ 业务接口失败"
+  exit 1
+}
+
+echo "✅ API接口验证通过"
+```
+
+### 2.3 核心功能测试标准 ✅
+
+**必须通过的核心功能测试用例：**
+
+1. **用户认证**
+   - 正确凭据登录成功
+   - 错误凭据登录失败
+   - 登录后正确跳转
+
+2. **核心业务功能**
+   - 主要业务对象的CRUD操作
+   - 列表显示和搜索筛选
+   - 业务数据的一致性验证
+
+3. **系统级功能**
+   - 导航和页面跳转
+   - 数据同步和更新
+   - 错误处理和用户反馈
+
+## 📋 第三部分：自动化测试要求
+
+### 3.1 自动化测试执行标准 ✅
+
+**所有测试必须通过，0失败率：**
+
+```bash
+# 1. 基础功能测试
+${TEST_RUNNER} ${BASIC_TEST_SUITE} --reporter=line
+
+# 2. 核心业务功能测试  
+${TEST_RUNNER} ${BUSINESS_TEST_SUITE} --reporter=line
+
+# 3. 完整回归测试
+${TEST_RUNNER} ${COMPREHENSIVE_TEST_SUITE} --reporter=line
+
+# 4. 验证测试结果
+echo "所有测试必须显示 'passed'，任何 'failed' 都不能接受"
+```
+
+### 3.2 手动验证检查清单 ✅
+
+**自动化测试通过后，必须进行手动验证：**
+
+- [ ] 浏览器打开应用显示正确的技术栈界面
+- [ ] 登录页面输入正确凭据能成功登录
+- [ ] 核心业务功能能正确显示，无undefined错误
+- [ ] 新建数据保存后列表立即刷新显示
+- [ ] 富文本编辑器等复杂组件能正常加载
+- [ ] 关联功能能正确建立关系
+
+## 📋 第四部分：问题修复标准
+
+### 4.1 问题优先级定义
+
+**P0 - 阻塞级（必须立即修复）：**
+- 前端显示错误的技术栈内容
+- 核心认证功能完全无法使用
+- 端口冲突导致服务无法启动
+
+**P1 - 严重级（当轮必须修复）：**
+- 核心业务功能显示undefined
+- 数据创建后列表不更新
+- 关键组件无法加载
+
+**P2 - 一般级（可延后修复）：**
+- 界面样式问题
+- 非核心功能异常
+
+### 4.2 修复验证流程
+
+**每个问题修复后必须执行：**
+
+1. **代码修改** → 2. **重启服务** → 3. **自动化测试** → 4. **手动验证** → 5. **回归测试**
+
+**任何一步失败都必须重新修复，不得跳过。**
+
+## 📋 第五部分：交付标准
+
+### 5.1 交付前检查清单 ✅
+
+**必须全部通过的交付条件：**
+
+- [ ] 环境清理和启动验证100%通过
+- [ ] 所有P0和P1问题已修复
+- [ ] 自动化测试0失败率
+- [ ] 手动验证检查清单100%通过
+- [ ] 主流程端到端测试成功
+- [ ] 提供详细测试截图和日志
+
+### 5.2 文档要求
+
+**交付时必须提供：**
+
+1. **测试执行报告**：包含所有测试步骤和结果
+2. **问题修复清单**：列出发现和修复的所有问题
+3. **系统架构文档**：确认技术栈统一性
+4. **配置清单**：所有端口和URL配置说明
+
+### 5.3 回滚策略
+
+**如果UAT测试失败：**
+
+1. 立即停止交付流程
+2. 记录失败原因和现象
+3. 按问题优先级制定修复计划
+4. 重新执行完整UAT流程
+5. 只有100%通过才能交付
+
+## ⚠️ 违规处理
+
+**以下行为被视为违规，必须重新执行完整流程：**
+
+- 跳过任何检查步骤
+- 简化测试用例
+- 修改配置规避问题
+- 声称"测试通过"但未提供证据
+- 不修复P0/P1问题就尝试交付
+
+## 🎯 成功标准
+
+**只有满足以下条件才算UAT成功：**
+
+1. ✅ 所有自动化测试通过率100%
+2. ✅ 手动验证检查清单100%完成
+3. ✅ 前端确认为期望的技术栈应用
+4. ✅ 核心功能完全正常
+5. ✅ 提供完整测试文档和截图
+
+## 📝 变量配置参考
+
+**在具体项目中，需要在配置文件中定义以下变量：**
+
+```bash
+# 端口配置
+BACKEND_PORT=3000
+FRONTEND_PORT=3001
+TEST_PORT=4000
+
+# 目录配置
+PROJECT_ROOT=/path/to/project
+FRONTEND_DIR=src/frontend
+BACKEND_DIR=src/backend
+CONFIG_FILE=config/ports.json
+
+# 进程模式配置
+FRONTEND_PROCESS_PATTERN="react-scripts|webpack"
+BACKEND_PROCESS_PATTERN="node.*3000"
+
+# URL配置
+FRONTEND_URL=http://localhost:3001
+BACKEND_HEALTH_URL=http://localhost:3000/health
+LOGIN_API_URL=http://localhost:3000/api/auth/login
+BUSINESS_API_URL=http://localhost:3000/api/business
+
+# 技术栈标识
+FRONTEND_IDENTIFIER="React|Vue|Angular"
+LOGIN_SUCCESS_FIELD=".success"
+TOKEN_FIELD=".token"
+BUSINESS_DATA_FIELD=".data"
+
+# 启动命令
+BACKEND_START_CMD="npm run dev"
+FRONTEND_START_CMD="PORT=3001 npm start"
+
+# 测试配置
+TEST_RUNNER="npx playwright test"
+BASIC_TEST_SUITE="tests/e2e/basic"
+BUSINESS_TEST_SUITE="tests/e2e/business"  
+COMPREHENSIVE_TEST_SUITE="tests/e2e/comprehensive"
+
+# 缓存目录
+CACHE_DIRS="build node_modules/.cache .eslintcache"
+
+# 登录测试数据
+LOGIN_PAYLOAD='{"username":"test@example.com","password":"password"}'
+```
+
+**项目稳定性和可预测性是一人公司成功的基础。** 

@@ -1,0 +1,61 @@
+{
+  "timestamp": "2025-06-04T05:08:29.048Z",
+  "summary": {
+    "total": 10,
+    "passed": 5,
+    "failed": 5,
+    "passRate": "50.0"
+  },
+  "results": [
+    {
+      "name": "1. 后端服务健康检查",
+      "passed": false,
+      "details": "服务不健康"
+    },
+    {
+      "name": "2. 用户认证 - 登录",
+      "passed": true,
+      "details": "获取到认证token"
+    },
+    {
+      "name": "3. 标签管理API",
+      "passed": true,
+      "details": "获取到0个标签，创建标签成功"
+    },
+    {
+      "name": "4. 联系人管理API",
+      "passed": true,
+      "details": "获取到0个联系人，创建联系人成功"
+    },
+    {
+      "name": "5. 模板管理API",
+      "passed": false,
+      "details": "API调用失败: Cannot read properties of undefined (reading 'length')"
+    },
+    {
+      "name": "6. 活动管理API",
+      "passed": false,
+      "details": "API调用失败: Cannot read properties of undefined (reading 'length')"
+    },
+    {
+      "name": "7. 任务管理API",
+      "passed": false,
+      "details": "API调用失败: Cannot read properties of undefined (reading 'length')"
+    },
+    {
+      "name": "8. 前端页面可访问性",
+      "passed": false,
+      "details": "前端服务未启动"
+    },
+    {
+      "name": "9. 路由配置正确性",
+      "passed": true,
+      "details": "所有编辑路由格式正确"
+    },
+    {
+      "name": "10. 组件功能完整性",
+      "passed": true,
+      "details": "✓ ContactForm.tsx, ✓ ContactImport.tsx, ✓ TemplateForm.tsx"
+    }
+  ]
+}

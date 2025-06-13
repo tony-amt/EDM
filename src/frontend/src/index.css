@@ -1,0 +1,43 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* 页面内容区域滚动样式 */
+.ant-layout-content {
+  overflow-y: auto;
+  height: calc(100vh - 64px);
+  padding: 24px;
+}
+
+/* 表格操作按钮间距 */
+.action-btn {
+  margin-right: 8px;
+}
+
+/* 解决表单项目间距过大问题 */
+.ant-form-item {
+  margin-bottom: 16px;
+}
+
+/* 表格偶数行背景色 */
+.ant-table-tbody > tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* 主色调定义 */
+:root {
+  --primary-color: #1890ff;
+  --success-color: #52c41a;
+  --warning-color: #faad14;
+  --error-color: #f5222d;
+} 
