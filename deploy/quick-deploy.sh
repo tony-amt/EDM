@@ -19,7 +19,7 @@ NC='\033[0m'
 SERVER_IP="43.135.38.15"
 DOMAIN="tkmail.fun"
 EMAIL="zhangton58@gmail.com"
-GITHUB_REPO="https://github.com/YOUR_USERNAME/EDM.git"
+GITHUB_REPO="https://github.com/tony-amt/EDM.git"
 
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
