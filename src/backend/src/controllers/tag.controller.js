@@ -652,7 +652,7 @@ exports.addTagToContact = async (req, res) => {
     const { tagId: bodyTagId, autoInherit = true } = req.body;
     
     const tagId = paramTagId || bodyTagId;
-    
+
     if (!tagId) {
       await transaction.rollback();
       logger.warn('[addTagToContact] tagId not provided in params or body.');

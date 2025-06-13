@@ -302,7 +302,7 @@ class ContactService {
       // V3.0: 处理标签更新 - 双向同步
       if (tagIds !== undefined) {
         const oldTagIds = contactInstance.tags || [];
-        
+
         let validTagIds = [];
         if (Array.isArray(tagIds) && tagIds.length > 0) {
           const validTags = await Tag.findAll({
