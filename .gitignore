@@ -10,6 +10,8 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env-temp
+.env.bak
 
 # Build outputs
 build/
@@ -49,9 +51,23 @@ coverage/
 ehthumbs.db
 Thumbs.db
 
-# Database
+# Database files and data
 *.sqlite
 *.db
+*.rdb
+dump.rdb
+data/
+pgdata/
+
+# Docker volumes and data
+data/postgres/
+data/redis/
+
+# Test results and reports
+test-results/
+playwright-report/
+coverage/
+*.json.report
 
 # Temporary files
 tmp/
@@ -60,4 +76,14 @@ temp/
 # Production config files (will be created on server)
 docker-compose.prod.yml
 nginx.conf
-ssl/ 
+ssl/
+
+# Backup files
+*.bak
+*.backup
+
+# Lock files (keep package-lock.json but ignore others)
+yarn.lock
+
+# Editor specific
+.vscode/settings.json 
