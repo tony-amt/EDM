@@ -176,6 +176,59 @@ class UploadController {
       next(error);
     }
   }
+
+  /**
+   * 为邮件提供图片代理服务
+   */
+  async serveEmailImage(req, res, next) {
+    try {
+      const { filename } = req.params;
+      
+      // 安全检查：防止路径遍历攻击
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        throw new AppError('无效的文件名', 400);
+      }
+      
+      // 构建文件路径
+      const uploadsDir = path.join(__dirname, '../../public/uploads');
+      const filePath = path.join(uploadsDir, filename);
+      
+      // 检查文件是否存在
+      if (!fs.existsSync(filePath)) {
+        throw new AppError('图片文件不存在', 404);
+      }
+      
+      // 获取文件扩展名以确定MIME类型
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml'
+      };
+      
+      const mimeType = mimeTypes[ext] || 'application/octet-stream';
+      
+      // 设置响应头
+      res.set({
+        'Content-Type': mimeType,
+        'Cache-Control': 'public, max-age=31536000', // 缓存1年
+        'Access-Control-Allow-Origin': '*', // 允许跨域访问
+        'Access-Control-Allow-Methods': 'GET',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      });
+      
+      // 发送文件
+      res.sendFile(filePath);
+      
+      logger.info(`邮件图片代理服务: ${filename}`);
+      
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = {

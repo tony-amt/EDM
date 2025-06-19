@@ -12,7 +12,7 @@ const JWT_SECRET = process.env.NODE_ENV === 'test'
 // 永久测试Token - 仅在开发环境使用
 const PERMANENT_TEST_TOKEN = 'dev-permanent-test-token-admin-2025';
 const TEST_ADMIN_USER = {
-  id: '97c081a0-ef1d-4db6-b82a-15fc98370871',
+  id: '97b42886-778a-4495-9f18-07e382794a2a',
   username: 'admin',
   email: 'admin@example.com',
   role: 'admin',

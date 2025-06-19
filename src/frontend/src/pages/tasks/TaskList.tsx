@@ -61,6 +61,22 @@ interface Task {
   pause_reason?: string;
   created_at: string;
   updated_at: string;
+  // 统计数据
+  total_subtasks?: number;
+  pending_subtasks?: number;
+  allocated_subtasks?: number;
+  summary_stats?: {
+    total_recipients: number;
+    pending: number;
+    allocated: number;
+    sending: number;
+    sent: number;
+    delivered: number;
+    bounced: number;
+    opened: number;
+    clicked: number;
+    failed: number;
+  };
 }
 
 const TaskList: React.FC = () => {
@@ -346,54 +362,126 @@ const TaskList: React.FC = () => {
   // 表格列定义
   const columns = [
     {
-      title: '名称',
+      title: '任务名',
       dataIndex: 'name',
       key: 'name',
+      width: 150,
       render: (text: string) => <Text strong>{text}</Text>
+    },
+    {
+      title: '邮件内容',
+      key: 'content',
+      width: 100,
+      render: () => (
+        <Button type="link" size="small">
+          查看内容
+        </Button>
+      )
+    },
+    {
+      title: '发送数量',
+      key: 'send_count',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: Task) => {
+        const total = record.summary_stats?.total_recipients || record.total_subtasks || 0;
+        return <Text>{total}</Text>;
+      }
+    },
+    {
+      title: '已发量',
+      key: 'sent_count',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: Task) => {
+        const sent = record.summary_stats?.sent || 0;
+        return <Text>{sent}</Text>;
+      }
+    },
+    {
+      title: '打开数',
+      key: 'open_count',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: Task) => {
+        const opened = record.summary_stats?.opened || 0;
+        return <Text>{opened}</Text>;
+      }
+    },
+    {
+      title: '打开率',
+      key: 'open_rate',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: Task) => {
+        const sent = record.summary_stats?.sent || 0;
+        const opened = record.summary_stats?.opened || 0;
+        const rate = sent > 0 ? ((opened / sent) * 100).toFixed(1) : '0.0';
+        return <Text>{rate}%</Text>;
+      }
+    },
+    {
+      title: '退订数',
+      key: 'unsubscribe_count',
+      width: 80,
+      align: 'center' as const,
+      render: () => <Text>0</Text> // 暂时显示0，后续实现退订功能
+    },
+    {
+      title: '点击数',
+      key: 'click_count',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: Task) => {
+        const clicked = record.summary_stats?.clicked || 0;
+        return <Text>{clicked}</Text>;
+      }
+    },
+    {
+      title: '点击率',
+      key: 'click_rate',
+      width: 80,
+      align: 'center' as const,
+      render: (_: any, record: Task) => {
+        const sent = record.summary_stats?.sent || 0;
+        const clicked = record.summary_stats?.clicked || 0;
+        const rate = sent > 0 ? ((clicked / sent) * 100).toFixed(1) : '0.0';
+        return <Text>{rate}%</Text>;
+      }
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      width: 100,
       render: (status: string, record: Task) => renderStatus(status, record)
-    },
-    {
-      title: '任务类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: string) => {
-        // 🔧 修复：处理type为undefined的情况
-        if (!type) return '单次发送';
-        return type === 'one_time' ? '单次发送' : '序列发送';
-      }
-    },
-    {
-      title: '计划时间',
-      dataIndex: 'schedule_time',
-      key: 'schedule_time',
-      render: (text: string) => renderDateTime(text) // 🔧 修复：使用安全的时间渲染函数
     },
     {
       title: '所属活动',
       dataIndex: 'campaign_name',
       key: 'campaign_name',
-      render: (text: string) => text || '-' // 🔧 修复：处理空值
+      width: 120,
+      render: (text: string) => text || '-'
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (text: string) => renderDateTime(text) // 🔧 修复：使用安全的时间渲染函数
+      width: 150,
+      render: (text: string) => renderDateTime(text)
     },
     {
       title: '操作',
       key: 'action',
+      width: 200,
+      fixed: 'right' as const,
       render: (_: any, record: Task) => (
-        <Space size="middle">
+        <Space size="small">
           {renderStatusActions(record)}
           <Tooltip title="查看">
             <Button
               type="text"
+              size="small"
               icon={<EyeOutlined />}
               onClick={() => handleView(record.id)}
             />
@@ -402,6 +490,7 @@ const TaskList: React.FC = () => {
             <Tooltip title="编辑">
               <Button
                 type="text"
+                size="small"
                 icon={<EditOutlined />}
                 onClick={() => handleEdit(record.id)}
               />
@@ -417,6 +506,7 @@ const TaskList: React.FC = () => {
               >
                 <Button
                   type="text"
+                  size="small"
                   danger
                   icon={<DeleteOutlined />}
                 />
@@ -469,6 +559,8 @@ const TaskList: React.FC = () => {
         loading={loading}
         pagination={pagination}
         onChange={handleTableChange}
+        scroll={{ x: 1400 }}
+        size="small"
       />
 
       <ScheduleTimeModal

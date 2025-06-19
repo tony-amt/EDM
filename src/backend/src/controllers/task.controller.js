@@ -1,7 +1,9 @@
 const TaskService = require('../services/core/task.service');
 const SubTaskService = require('../services/core/subtask.service');
+const { Task } = require('../models');
+const { AppError } = require('../utils/errorHandler');
 const catchAsync = require('../utils/catchAsync');
-const AppError = require('../utils/appError');
+const logger = require('../utils/logger');
 const { validationResult } = require('express-validator');
 
 const sendSuccess = (res, data, statusCode = 200) => {
@@ -434,6 +436,73 @@ class TaskController {
         original_status: task.status,
         current_status: updatedTask.status,
         updated: task.status !== updatedTask.status
+      }
+    });
+  });
+
+  /**
+   * V2.0: 手动更新任务统计数据
+   * POST /api/tasks/:id/update-stats
+   */
+  updateTaskStats = catchAsync(async (req, res) => {
+    const userId = req.user.id;
+    const taskId = req.params.id;
+
+    // 验证任务是否属于用户
+    await TaskService.getTaskById(taskId, userId);
+
+    // 获取QueueScheduler实例并更新统计
+    const QueueScheduler = require('../services/infrastructure/QueueScheduler');
+    const scheduler = new QueueScheduler();
+    
+    await scheduler.updateTaskStats(taskId);
+
+    // 重新获取更新后的任务
+    const updatedTask = await TaskService.getTaskById(taskId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: '任务统计数据更新成功',
+      data: updatedTask
+    });
+  });
+
+  /**
+   * V2.0: 批量更新所有任务统计数据
+   * POST /api/tasks/batch-update-stats
+   */
+  batchUpdateTaskStats = catchAsync(async (req, res) => {
+    const userId = req.user.id;
+
+    // 获取用户的所有任务
+    const tasks = await Task.findAll({
+      where: { created_by: userId },
+      attributes: ['id', 'name']
+    });
+
+    const QueueScheduler = require('../services/infrastructure/QueueScheduler');
+    const scheduler = new QueueScheduler();
+    
+    let updated = 0;
+    let failed = 0;
+
+    for (const task of tasks) {
+      try {
+        await scheduler.updateTaskStats(task.id);
+        updated++;
+      } catch (error) {
+        logger.error(`更新任务 ${task.id} 统计失败:`, error);
+        failed++;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: '批量更新任务统计完成',
+      data: {
+        total: tasks.length,
+        updated,
+        failed
       }
     });
   });

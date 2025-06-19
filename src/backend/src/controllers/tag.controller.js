@@ -10,9 +10,8 @@ const logger = require('../utils/logger');
 exports.getTags = async (req, res) => {
   try {
     const where = {};
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能查看自己的标签
       where.user_id = req.user.id;
-    }
     
     // 支持按父级ID过滤
     if (req.query.parentId) {
@@ -21,6 +20,9 @@ exports.getTags = async (req, res) => {
       } else {
         where.parent_id = req.query.parentId;
       }
+    } else {
+      // 🔧 修复：默认只返回根标签（parent_id为null），避免子标签重复显示
+      where.parent_id = null;
     }
     
     // 支持搜索
@@ -82,9 +84,8 @@ exports.getTags = async (req, res) => {
 exports.getTagTree = async (req, res) => {
   try {
     const userWhere = {};
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能查看自己的标签树
       userWhere.user_id = req.user.id;
-    }
     
     logger.info(`[getTagTree] Querying tags with where: ${JSON.stringify(userWhere)} by user ${req.user.id} (${req.user.role})`);
     
@@ -179,9 +180,8 @@ exports.getTagTree = async (req, res) => {
 exports.getTag = async (req, res) => {
   try {
     const where = { id: req.params.id };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能查看自己的标签
       where.user_id = req.user.id;
-    }
     
     logger.info(`[getTag] Querying tag with where: ${JSON.stringify(where)} by user ${req.user.id} (${req.user.role})`);
     
@@ -341,9 +341,8 @@ exports.updateTag = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const findWhere = { id: req.params.id };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能修改自己的标签
       findWhere.user_id = req.user.id;
-    }
     
     logger.info(`[updateTag] Finding tag with: ${JSON.stringify(findWhere)} by user ${req.user.id} (${req.user.role})`);
     
@@ -497,9 +496,8 @@ exports.deleteTag = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
     const findWhere = { id: req.params.id };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能删除自己的标签
       findWhere.user_id = req.user.id;
-    }
     
     logger.info(`[deleteTag] Finding tag with: ${JSON.stringify(findWhere)} by user ${req.user.id} (${req.user.role})`);
     
@@ -577,9 +575,8 @@ exports.getContactsByTag = async (req, res) => {
   try {
     const tagId = req.params.id;
     const findWhere = { id: tagId };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能访问自己的标签
       findWhere.user_id = req.user.id;
-    }
     
     logger.info(`[getContactsByTag] Querying tag with where: ${JSON.stringify(findWhere)} by user ${req.user.id} (${req.user.role})`);
     
@@ -664,10 +661,9 @@ exports.addTagToContact = async (req, res) => {
     const contactWhere = { id: contactId };
     const tagWhere = { id: tagId };
 
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能访问自己的数据
       contactWhere.user_id = req.user.id;
       tagWhere.user_id = req.user.id;
-    }
     
     logger.info(`[addTagToContact] Contact where: ${JSON.stringify(contactWhere)}, Tag where: ${JSON.stringify(tagWhere)}`);
 
@@ -771,10 +767,9 @@ exports.removeTagFromContact = async (req, res) => {
     const contactWhere = { id: contactId };
     const tagWhere = { id: tagId };
 
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能访问自己的数据
       contactWhere.user_id = req.user.id;
       tagWhere.user_id = req.user.id; 
-    }
     
     logger.info(`[removeTagFromContact] Contact where: ${JSON.stringify(contactWhere)}, Tag where: ${JSON.stringify(tagWhere)}`);
 
@@ -1104,9 +1099,8 @@ exports.moveTag = async (req, res) => {
     const { parentId } = req.body;
     
     const findWhere = { id };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能访问自己的标签
       findWhere.user_id = req.user.id;
-    }
 
     const tag = await Tag.findOne({ where: findWhere, transaction });
 
@@ -1197,7 +1191,8 @@ exports.createSplitTest = async (req, res) => {
       testName, 
       groupCount = 2, 
       splitRatio = null, 
-      groupNames = null 
+      groupNames = null,
+      isRegroup = false // 新增：是否为重新分组
     } = req.body;
 
     // 验证参数
@@ -1219,9 +1214,8 @@ exports.createSplitTest = async (req, res) => {
 
     // 验证标签存在性
     const tagWhere = { id: tagId };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能访问自己的标签
       tagWhere.user_id = req.user.id;
-    }
 
     const tag = await Tag.findOne({ where: tagWhere, transaction });
     if (!tag) {
@@ -1232,22 +1226,53 @@ exports.createSplitTest = async (req, res) => {
       });
     }
 
-    // 检查是否已经存在相同名称的分组测试
+    // 如果是重新分组，先删除现有的子标签
+    if (isRegroup) {
+      const existingChildTags = await Tag.findAll({
+        where: {
+          parent_id: tagId,
+          user_id: tag.user_id
+        },
+        transaction
+      });
+
+      if (existingChildTags.length > 0) {
+        logger.info(`[createSplitTest] Regroup mode: deleting ${existingChildTags.length} existing child tags`);
+        
+        // 删除现有子标签并从联系人中移除这些标签
+        for (const childTag of existingChildTags) {
+          // 从所有联系人中移除这个子标签
+          const childTagContacts = childTag.contacts || [];
+          for (const contactId of childTagContacts) {
+            const contact = await Contact.findByPk(contactId, { transaction });
+            if (contact) {
+              const currentTags = contact.tags || [];
+              const updatedTags = currentTags.filter(tagId => tagId !== childTag.id);
+              await Contact.update(
+                { tags: updatedTags },
+                { where: { id: contactId }, transaction }
+              );
+            }
+          }
+          
+          // 删除子标签
+          await Tag.destroy({ where: { id: childTag.id }, transaction });
+        }
+      }
+    } else {
+      // 检查是否已经存在分组（继续分组模式）
     const existingTestTags = await Tag.findAll({
       where: {
         parent_id: tagId,
-        name: { [Op.like]: `${testName}_%` },
+          name: { [Op.like]: `${tag.name}_分组%` },
         user_id: tag.user_id
       },
       transaction
     });
 
     if (existingTestTags.length > 0) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: `测试名称"${testName}"已存在，请使用不同的测试名称或先删除现有分组`
-      });
+        logger.info(`[createSplitTest] Continue grouping mode: found ${existingTestTags.length} existing groups`);
+      }
     }
 
     logger.info(`[createSplitTest] Creating split test for tag: ${tag.name} with ${groupCount} groups`);
@@ -1297,9 +1322,9 @@ exports.createSplitTest = async (req, res) => {
       });
     }
 
-    // 生成分组名称
+    // 生成分组名称 - 使用标签名_分组N的格式
     const finalGroupNames = groupNames || 
-      Array.from({ length: groupCount }, (_, i) => `${String.fromCharCode(65 + i)}组`);
+      Array.from({ length: groupCount }, (_, i) => `分组${i + 1}`);
 
     // 按比例分配联系人
     const groups = [];
@@ -1326,7 +1351,7 @@ exports.createSplitTest = async (req, res) => {
     const createdGroups = [];
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      const groupTagName = `${testName}_${group.groupName}`;
+      const groupTagName = `${tag.name}_${group.groupName}`; // 使用父标签名_分组N格式
       
       // 检查标签名称是否已存在
       const existingGroupTag = await Tag.findOne({
@@ -1423,9 +1448,8 @@ exports.getContactTags = async (req, res) => {
     const { id: contactId } = req.params;
     
     const contactWhere = { id: contactId };
-    if (req.user.role !== 'admin') {
+    // 🔒 安全修复：所有用户（包括管理员）只能访问自己的联系人
       contactWhere.user_id = req.user.id;
-    }
 
     const contact = await Contact.findOne({ where: contactWhere });
     if (!contact) {

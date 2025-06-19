@@ -28,3 +28,90 @@ alwaysApply: true
  - 使用环境替换功能在构建时注入正确配置
  - 构建后自动验证配置一致性
  - 预发布环境模拟生产配置进行测试
+
+
+
+**前端开发规范**
+
+### Phase 1: 接口设计阶段
+1. **后端先行**: 先确定数据模型和API端点
+2. **生成类型定义**: 根据后端模型生成TypeScript类型
+3. **前端确认**: 前端确认类型定义无误
+
+### Phase 2: 开发阶段
+1. **类型导入**: 前端只从 `types/api.ts` 导入类型
+2. **Service实现**: 每个方法必须对应明确的API端点
+3. **向后兼容**: 新方法提供旧方法的别名
+
+### Phase 3: 测试阶段
+1. **编译检查**: 确保TypeScript编译无错误
+2. **集成测试**: 验证前后端接口联调
+3. **类型检查**: 使用工具验证类型一致性
+
+
+
+## 🚫 禁止的做法
+
+### ❌ 直接在组件中定义类型
+```typescript
+// 错误: 组件内定义类型
+const ConversationDetail = () => {
+  interface Message { body: string }  // ❌
+}
+```
+
+### ❌ 硬编码字段名
+```typescript
+// 错误: 硬编码访问不存在的字段
+message.body              // ❌ 应使用 content_text
+message.html_body         // ❌ 应使用 content_html
+message.is_read          // ❌ 应使用 status === 'read'
+```
+
+### ❌ 方法名不对应API
+```typescript
+// 错误: 方法名与API不对应
+getConversationById()     // ❌ API是 /conversations/:id
+sendMessage()            // ❌ API是 /conversations/:id/reply
+```
+
+## ✅ 推荐的做法
+
+### ✅ 集中类型管理
+```typescript
+// src/types/api.ts - 统一类型定义
+export interface ConversationMessage {
+  content_text?: string;
+  content_html?: string;
+  status: MessageStatus;
+}
+```
+
+### ✅ 清晰的API映射
+```typescript
+class ConversationService {
+  // 每个方法都有清晰的API文档
+  /**
+   * 获取会话列表
+   * @api GET /api/conversations
+   * @param params 查询参数
+   * @returns 会话列表响应
+   */
+  async getConversations(params?: ConversationListParams) {
+    // 实现
+  }
+}
+```
+
+### ✅ 向后兼容策略
+```typescript
+// 提供别名方法保持向后兼容
+async getConversationById(id: string) {
+  return this.getConversationDetail(id);
+}
+
+// 导出类型别名
+export type EmailMessage = ConversationMessage;
+```
+
+

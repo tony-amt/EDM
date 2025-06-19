@@ -70,7 +70,7 @@ interface ApiEndpoints {
 const environmentConfigs: Record<string, EnvironmentConfig> = {
   development: {
     NODE_ENV: 'development',
-    API_BASE_URL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api',
+    API_BASE_URL: process.env.REACT_APP_API_BASE_URL || '/api',
     API_TIMEOUT: parseInt(process.env.REACT_APP_API_TIMEOUT || '10000'),
     JWT_STORAGE_KEY: 'edm_token',
     ENABLE_MOCK: process.env.REACT_APP_ENABLE_MOCK === 'true',
@@ -88,7 +88,7 @@ const environmentConfigs: Record<string, EnvironmentConfig> = {
   },
   test: {
     NODE_ENV: 'test',
-    API_BASE_URL: 'http://localhost:3000/api',
+    API_BASE_URL: '/api',
     API_TIMEOUT: 5000,
     JWT_STORAGE_KEY: 'edm_token_test',
     ENABLE_MOCK: true,

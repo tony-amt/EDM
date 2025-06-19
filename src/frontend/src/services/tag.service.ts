@@ -45,6 +45,7 @@ export interface SplitTestData {
   groupCount: number;
   splitRatio: number[];
   groupNames: string[];
+  isRegroup?: boolean;
 }
 
 export interface SplitTestResponse {
@@ -108,7 +109,7 @@ const tagService = {
   },
 
   // 获取标签树结构
-  getTagTree: async () => {
+  getTagTree: async (): Promise<TagTreeResponse> => {
     const response = await api.get<TagTreeResponse>('/tags/tree');
     return response.data;
   },

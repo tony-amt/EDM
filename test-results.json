@@ -1,0 +1,92 @@
+{
+  "summary": {
+    "total": 13,
+    "passed": 12,
+    "failed": 1,
+    "success_rate": "92.3",
+    "critical_failures": 0
+  },
+  "details": [
+    {
+      "test": "后端服务健康检查",
+      "success": true,
+      "details": "服务正常，数据库状态: healthy",
+      "timestamp": "2025-06-18T09:37:28.502Z"
+    },
+    {
+      "test": "用户登录认证",
+      "success": true,
+      "details": "Token获取成功，用户: admin@example.com",
+      "timestamp": "2025-06-18T09:37:28.672Z"
+    },
+    {
+      "test": "会话管理-创建会话",
+      "success": false,
+      "details": "错误: [object Object]",
+      "timestamp": "2025-06-18T09:37:28.847Z"
+    },
+    {
+      "test": "Webhook服务-配置获取",
+      "success": {
+        "engagelab": "/webhook/engagelab"
+      },
+      "details": "支持事件: 8个",
+      "timestamp": "2025-06-18T09:37:28.998Z"
+    },
+    {
+      "test": "Webhook服务-EngageLab端点",
+      "success": true,
+      "details": "模拟webhook处理成功",
+      "timestamp": "2025-06-18T09:37:29.100Z"
+    },
+    {
+      "test": "追踪服务-状态更新",
+      "success": true,
+      "details": "状态更新记录成功",
+      "timestamp": "2025-06-18T09:37:32.202Z"
+    },
+    {
+      "test": "追踪服务-像素追踪",
+      "success": true,
+      "details": "1x1像素图片返回正常",
+      "timestamp": "2025-06-18T09:37:32.239Z"
+    },
+    {
+      "test": "追踪服务-统计查询",
+      "success": true,
+      "details": "事件总数: 2",
+      "timestamp": "2025-06-18T09:37:32.371Z"
+    },
+    {
+      "test": "图片服务-文件上传",
+      "success": true,
+      "details": "文件名: 1750239452443-ohgj6bhzez8.png",
+      "timestamp": "2025-06-18T09:37:32.599Z"
+    },
+    {
+      "test": "图片服务-文件列表",
+      "success": true,
+      "details": "文件数量: 1",
+      "timestamp": "2025-06-18T09:37:32.617Z"
+    },
+    {
+      "test": "图片服务-文件删除",
+      "success": true,
+      "details": "测试文件删除成功",
+      "timestamp": "2025-06-18T09:37:32.633Z"
+    },
+    {
+      "test": "邮件流程-入站处理",
+      "success": true,
+      "details": "入站邮件处理成功",
+      "timestamp": "2025-06-18T09:37:32.724Z"
+    },
+    {
+      "test": "邮件流程-会话更新",
+      "success": true,
+      "details": "找到相关会话数: 0",
+      "timestamp": "2025-06-18T09:37:32.961Z"
+    }
+  ],
+  "timestamp": "2025-06-18T09:37:32.961Z"
+}

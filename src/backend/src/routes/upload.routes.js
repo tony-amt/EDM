@@ -26,4 +26,19 @@ const router = express.Router();
  */
 router.post('/image', protect, uploadMiddleware, UploadController.uploadImage);
 
+/**
+ * @api {get} /api/upload/email-image/:filename 邮件图片代理
+ * @apiName EmailImageProxy
+ * @apiGroup Upload
+ * @apiDescription 为邮件提供图片代理服务，确保图片在邮件客户端中正确显示
+ * 
+ * @apiParam {String} filename 图片文件名
+ * 
+ * @apiSuccess {File} image 图片文件
+ * 
+ * @apiError (404) NotFound 图片文件不存在
+ * @apiError (500) InternalServerError 服务器内部错误
+ */
+router.get('/email-image/:filename', UploadController.serveEmailImage);
+
 module.exports = router; 

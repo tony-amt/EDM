@@ -285,7 +285,7 @@ class TrackingController {
   }
 
   /**
-   * EngageLab Webhook处理
+   * EngageLab Webhook处理 - 增强版
    * @route POST /api/tracking/webhook/engagelab
    */
   async handleEngagelabWebhook(req, res) {
@@ -298,12 +298,95 @@ class TrackingController {
         timestamp: timestamp.toISOString()
       });
 
-      // 处理不同类型的事件
+      // 验证签名（可选）
+      if (process.env.ENGAGELAB_WEBHOOK_VERIFY === 'true') {
+        const isValid = this.verifyEngagelabSignature(req);
+        if (!isValid) {
+          logger.warn(`⚠️ Webhook签名验证失败`, { webhookData });
+          return res.status(401).json({ success: false, message: 'Invalid signature' });
+        }
+      }
+
       const { event_type, custom_args, email_id, timestamp: eventTimestamp } = webhookData;
+      
+      // 处理不同类型的事件
+      switch (event_type) {
+        case 'delivered':
+        case 'opened':
+        case 'clicked':
+        case 'bounced':
+        case 'spam_report':
+        case 'unsubscribe':
+          await this.handleEmailStatusEvent(webhookData, timestamp);
+          break;
+          
+        case 'reply':
+        case 'inbound':
+          await this.handleEmailReply(webhookData, timestamp);
+          break;
+          
+        default:
+          logger.info(`ℹ️ 未处理的Webhook事件类型: ${event_type}`, { webhookData });
+      }
+
+      // 根据EngageLab文档要求，3秒内返回200状态码
+      res.status(200).json({
+        success: true,
+        message: `Event ${event_type} processed successfully`
+      });
+
+    } catch (error) {
+      logger.error(`❌ EngageLab Webhook处理失败: ${error.message}`, {
+        error: error.message,
+        stack: error.stack,
+        webhookData: req.body
+      });
+
+      // 根据EngageLab文档，返回5XX状态码会触发重试
+      res.status(500).json({
+        code: 2002,
+        message: `Webhook处理失败: ${error.message}`
+      });
+    }
+  }
+
+  /**
+   * 验证EngageLab WebHook签名
+   */
+  verifyEngagelabSignature(req) {
+    try {
+      const crypto = require('crypto');
+      const timestamp = req.headers['x-webhook-timestamp'];
+      const appKey = req.headers['x-webhook-appkey'];
+      const signature = req.headers['x-webhook-signature'];
+      const appSecret = process.env.ENGAGELAB_APP_KEY;
+
+      if (!timestamp || !appKey || !signature || !appSecret) {
+        return false;
+      }
+
+      // 根据文档：md5(X-WebHook-Timestamp+X-WebHook-AppKey+ APP KEY)
+      const expectedSignature = crypto
+        .createHash('md5')
+        .update(timestamp + appKey + appSecret)
+        .digest('hex');
+
+      return signature === expectedSignature;
+    } catch (error) {
+      logger.error('签名验证失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 处理邮件状态事件
+   */
+  async handleEmailStatusEvent(webhookData, timestamp) {
+    const { event_type, custom_args, email_id, timestamp: eventTimestamp, reason } = webhookData;
       
       if (!custom_args || !custom_args.subtask_id) {
         logger.warn(`⚠️ Webhook缺少subtask_id`, { webhookData });
-        return res.status(200).json({ success: true, message: 'Webhook received but no subtask_id' });
+      return;
       }
 
       const subTaskId = custom_args.subtask_id;
@@ -315,6 +398,7 @@ class TrackingController {
       switch (event_type) {
         case 'delivered':
           updateData = {
+          status: 'delivered',
             delivered_at: eventTime,
             tracking_data: sequelize.literal(`
               COALESCE(tracking_data, '{}')::jsonb || 
@@ -364,24 +448,46 @@ class TrackingController {
 
         case 'bounced':
           updateData = {
+          status: 'failed',
             bounced_at: eventTime,
-            status: 'failed',
-            error_message: `邮件退回: ${webhookData.reason || '未知原因'}`,
+          error_message: `邮件退回: ${reason || '未知原因'}`,
             tracking_data: sequelize.literal(`
               COALESCE(tracking_data, '{}')::jsonb || 
               jsonb_build_object(
                 'bounced_at', '${eventTime.toISOString()}',
-                'bounce_reason', '${webhookData.reason || ''}',
+              'bounce_reason', '${reason || ''}',
+              'email_id', '${email_id || ''}'
+            )
+          `)
+        };
+        logMessage = `📤 邮件退回: SubTask ${subTaskId}, 原因: ${reason || '未知'}`;
+        break;
+
+      case 'spam_report':
+        updateData = {
+          tracking_data: sequelize.literal(`
+            COALESCE(tracking_data, '{}')::jsonb || 
+            jsonb_build_object(
+              'spam_reported_at', '${eventTime.toISOString()}',
                 'email_id', '${email_id || ''}'
               )
             `)
           };
-          logMessage = `📤 邮件退回: SubTask ${subTaskId}, 原因: ${webhookData.reason || '未知'}`;
+        logMessage = `🚫 垃圾邮件举报: SubTask ${subTaskId}`;
           break;
 
-        default:
-          logger.info(`ℹ️ 未处理的Webhook事件类型: ${event_type}`, { webhookData });
-          return res.status(200).json({ success: true, message: `Event type ${event_type} noted` });
+      case 'unsubscribe':
+        updateData = {
+          tracking_data: sequelize.literal(`
+            COALESCE(tracking_data, '{}')::jsonb || 
+            jsonb_build_object(
+              'unsubscribed_at', '${eventTime.toISOString()}',
+              'email_id', '${email_id || ''}'
+            )
+          `)
+        };
+        logMessage = `📵 邮件退订: SubTask ${subTaskId}`;
+        break;
       }
 
       // 更新SubTask
@@ -391,30 +497,66 @@ class TrackingController {
 
       if (updatedRows > 0) {
         logger.info(`✅ ${logMessage}`);
+      
+      // 更新任务统计
+      const subTask = await SubTask.findByPk(subTaskId);
+      if (subTask) {
+        const QueueScheduler = require('../services/infrastructure/QueueScheduler');
+        const scheduler = new QueueScheduler();
+        await scheduler.updateTaskStats(subTask.task_id);
+      }
       } else {
         logger.warn(`⚠️ SubTask ${subTaskId} 未找到或未更新`);
       }
+  }
 
-      res.status(200).json({
-        success: true,
-        message: 'Webhook processed successfully',
-        event_type,
-        subtask_id: subTaskId
+  /**
+   * 处理邮件回复事件
+   */
+  async handleEmailReply(webhookData, timestamp) {
+    const EmailConversationService = require('../services/core/emailConversation.service');
+    
+    try {
+      const {
+        from_email,
+        from_name,
+        to_email,
+        to_name,
+        subject,
+        content_text,
+        content_html,
+        message_id,
+        in_reply_to,
+        references,
+        custom_args
+      } = webhookData;
+
+      logger.info(`📨 收到邮件回复`, {
+        from: from_email,
+        to: to_email,
+        subject,
+        message_id
+      });
+
+      // 创建或更新邮件会话
+      await EmailConversationService.handleInboundEmail({
+        from_email,
+        from_name,
+        to_email,
+        to_name,
+        subject,
+        content_text,
+        content_html,
+        message_id,
+        in_reply_to,
+        references,
+        custom_args,
+        received_at: timestamp
       });
 
     } catch (error) {
-      logger.error(`❌ 处理EngageLab Webhook失败: ${error.message}`, {
-        webhookData: req.body,
-        error: error.message,
-        stack: error.stack
-      });
-
-      // Webhook处理失败也要返回200，避免重复发送
-      res.status(200).json({
-        success: false,
-        message: 'Webhook processing failed but acknowledged',
-        error: error.message
-      });
+      logger.error(`处理邮件回复失败:`, error);
+      throw error;
     }
   }
 }

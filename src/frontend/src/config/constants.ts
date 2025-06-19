@@ -1,5 +1,5 @@
 // API基础URL  
-export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+export const API_URL = process.env.REACT_APP_API_BASE_URL || '/api';
 
 // 分页默认配置
 export const DEFAULT_PAGE_SIZE = 10;

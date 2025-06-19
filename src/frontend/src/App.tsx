@@ -26,6 +26,11 @@ import TemplateDetail from './pages/templates/TemplateDetail';
 import TemplateCreate from './pages/templates/TemplateCreate';
 import TemplateEdit from './pages/templates/TemplateEdit';
 
+// 会话管理页面组件
+import ConversationList from './pages/conversations/ConversationList';
+import ConversationDetail from './pages/conversations/ConversationDetail';
+import ConversationCreate from './pages/conversations/ConversationCreate';
+
 // V2.0 新增页面组件
 import SenderList from './pages/senders/SenderList';
 // import BulkTaskList from './pages/bulk-tasks/BulkTaskList';
@@ -95,6 +100,11 @@ const App = () => {
             <Route path="templates/create" element={<TemplateCreate />} />
             <Route path="templates/edit/:id" element={<TemplateEdit />} />
             <Route path="templates/:id" element={<TemplateDetail />} />
+            
+            {/* 会话管理路由 */}
+            <Route path="conversations" element={<ConversationList />} />
+            <Route path="conversations/new" element={<ConversationCreate />} />
+            <Route path="conversations/:id" element={<ConversationDetail />} />
             
             {/* V2.0 发件管理路由 */}
             <Route path="senders" element={<SenderList />} />

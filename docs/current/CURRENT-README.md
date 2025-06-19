@@ -168,3 +168,141 @@
 **当前迭代负责人**: 项目控制中心Agent  
 **文档维护**: 实时更新，每日同步  
 **最后更新**: 2025-01-27 
+
+# EDM系统当前状态报告
+
+**更新时间**: 2025-01-18  
+**版本**: V2.0 生产配置整理版  
+
+## 📋 当前状态概览
+
+### 🎯 主要成就
+- ✅ **配置统一**: 删除重复的生产配置，统一使用 `docker-compose.prod.yml`
+- ✅ **会话管理**: 实现双模式会话界面（收件箱模式 + 对话模式）
+- ✅ **Docker优化**: 解决Nginx代理和端口映射问题
+- ✅ **生产就绪**: 配置验证脚本确保部署质量
+
+### 🏗️ 当前架构
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Nginx (80)    │───▶│  Frontend (80)  │    │  Backend (8080) │
+│   反向代理       │    │  React应用      │    │  Node.js API    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                       │
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │  Redis (6379)   │    │ PostgreSQL      │
+                       │  缓存服务        │    │ (5432)          │
+                       └─────────────────┘    └─────────────────┘
+```
+
+## 🔧 技术栈状态
+
+### 核心服务 ✅
+- **数据库**: PostgreSQL 14 (生产稳定)
+- **缓存**: Redis 7 (性能优化)
+- **后端**: Node.js + Express (API稳定)
+- **前端**: React + TypeScript (功能完整)
+- **代理**: Nginx (路由配置完成)
+
+### 会话管理功能 ✅
+- **双模式界面**: 收件箱视图 + 对话视图
+- **实时更新**: WebSocket支持
+- **数据模型**: EmailConversation + EmailMessage
+- **API接口**: 完整的CRUD操作
+
+### 新增功能准备 🟡
+- **图片处理**: 环境变量已配置，服务待实现
+- **追踪像素**: 路由已准备，服务待开发  
+- **Webhook接收**: EngageLab集成配置完成
+
+## 📁 重要文件位置
+
+### 生产配置
+- `docker-compose.prod.yml` - **唯一生产配置** ⭐
+- `nginx/nginx.conf` - Nginx反向代理配置
+- `scripts/validate-production-config.sh` - 配置验证脚本
+
+### 会话管理
+- `src/frontend/src/pages/conversations/ConversationList.tsx` - 双模式界面
+- `src/backend/src/controllers/emailConversation.controller.js` - 会话API
+- `src/backend/src/models/emailConversation.model.js` - 数据模型
+
+### 文档记录
+- `docs/08-changes/CHANGE-PRODUCTION-CONFIG-20250118.md` - 配置变更记录
+- `docs/deployment/PRODUCTION_DEPLOYMENT_GUIDE.md` - 部署指南
+
+## 🚀 快速部署指南
+
+### 1. 配置验证
+```bash
+./scripts/validate-production-config.sh
+```
+
+### 2. 生产部署
+```bash
+# 基础服务部署（当前可用）
+docker compose -f docker-compose.prod.yml up -d
+
+# 服务状态检查
+docker compose -f docker-compose.prod.yml ps
+```
+
+### 3. 功能验证
+- **网站访问**: http://tkmail.fun
+- **会话管理**: /conversations（双模式切换）
+- **API健康**: /api/health
+- **管理登录**: admin / admin123456
+
+## 📊 生产环境信息
+
+### 域名配置
+- **主域名**: tkmail.fun
+- **服务器IP**: 43.135.38.15
+- **SSL状态**: 可选配置
+
+### 端口分配
+- **80/443**: Nginx (外部访问)
+- **8080**: Backend API (内部)
+- **5432**: PostgreSQL (内部)
+- **6379**: Redis (内部)
+
+### 环境变量
+- **数据库**: postgres/postgres/amt_mail_system
+- **JWT密钥**: 已配置生产密钥
+- **CORS**: 包含tkmail.fun和服务器IP
+- **EngageLab**: API用户和密钥已配置
+
+## 🔮 下一步计划
+
+### 短期目标 (1-2周)
+1. **微服务开发**: 实现图片、追踪、webhook服务
+2. **功能集成**: 启用Docker Compose中的注释服务
+3. **测试验证**: 端到端功能测试
+
+### 中期目标 (1个月)
+1. **EngageLab集成**: 完整的webhook回调处理
+2. **性能优化**: 负载测试和性能调优
+3. **监控告警**: 生产环境监控体系
+
+## ⚠️ 重要提醒
+
+### 配置管理
+- ❌ **禁止创建新的生产配置文件**
+- ✅ **统一使用 docker-compose.prod.yml**
+- ✅ **所有变更必须记录在docs/08-changes/**
+
+### 部署流程
+- 必须先运行配置验证脚本
+- 遵循滚动更新策略
+- 保持数据备份和回滚能力
+
+### 联系方式
+- **技术支持**: 检查容器日志和配置文件
+- **紧急问题**: 使用快速回滚方案
+
+---
+
+**当前维护者**: Tony  
+**最后检查**: 2025-01-18  
+**配置状态**: ✅ 生产就绪  
+**下次评估**: 待微服务完成后 

@@ -79,24 +79,27 @@ const TagManagement: React.FC = () => {
   const fetchTags = async () => {
     setLoading(true);
     try {
-      const response = await tagService.getTagTree();
-      const tagTree = response.data;
+      const response = await tagService.getTagTree(); // 返回 TagTreeResponse
+      console.log('🔧 [DEBUG] API原始响应:', response);
+      const tagTree = response.data; // 提取 data 字段得到 TagTreeNode[]
       
       console.log('🔧 [DEBUG] 获取到的标签树数据:', tagTree);
       
-      // 只获取一级标签（父标签）
-      const parentTags = tagTree.filter(tag => !(tag as any).parent_id);
+      // 确保只显示根标签（没有parentId的标签）
+      const parentTags = tagTree.filter(tag => !tag.parentId);
       
-      console.log('🔧 [DEBUG] 过滤后的父标签:', parentTags);
+      console.log('🔧 [DEBUG] 根标签数组:', parentTags);
       
       // 计算统计信息
       const tagsWithStats: TagWithStats[] = await Promise.all(
         parentTags.map(async (tag) => {
-          const children = tagTree.filter(child => (child as any).parent_id === tag.id);
+          const children = tag.children || []; // 直接使用API返回的children
           const groupCount = children.length;
           const totalContacts = tag.contact_count || 0;
           
           console.log(`🔧 [DEBUG] 标签 "${tag.name}" - 子标签数: ${groupCount}, 总联系人: ${totalContacts}`);
+          console.log(`🔧 [DEBUG] children原始数据:`, children);
+          console.log(`🔧 [DEBUG] children中第一个对象:`, children[0]);
           console.log(`🔧 [DEBUG] 子标签列表:`, children.map(c => ({ name: c.name, contact_count: c.contact_count })));
           
           // 计算已分组和未分组人数
@@ -117,7 +120,31 @@ const TagManagement: React.FC = () => {
       );
       
       console.log('🔧 [DEBUG] 最终的标签统计数据:', tagsWithStats);
-      setTags(tagsWithStats);
+      console.log('🚨 [CRITICAL] 即将设置到表格的数据:', tagsWithStats);
+      
+      // 最终确保：只设置真正的根标签（没有parentId的标签）
+      const finalRootTags = tagsWithStats.filter(tag => !tag.parentId);
+      
+      console.log('🚨 [CRITICAL] 最终根标签数据:', finalRootTags);
+      console.log('🚨 [CRITICAL] 过滤掉的标签:', tagsWithStats.filter(tag => tag.parentId));
+      
+      setTags(finalRootTags);
+      
+      // 自动展开有子标签的父级标签
+      const parentTagsWithChildren = tagsWithStats
+        .filter(tag => tag.children && tag.children.length > 0)
+        .map(tag => tag.id);
+      
+      console.log('🔧 [DEBUG] 需要自动展开的父标签ID:', parentTagsWithChildren);
+      console.log('🔧 [DEBUG] 标签详细信息:', tagsWithStats.map(tag => ({
+        id: tag.id,
+        name: tag.name,
+        hasChildren: !!(tag.children && tag.children.length > 0),
+        childrenCount: tag.children ? tag.children.length : 0
+      })));
+      
+      setExpandedRowKeys(parentTagsWithChildren);
+      
     } catch (error) {
       console.error('获取标签失败:', error);
       message.error('获取标签失败');
@@ -129,10 +156,16 @@ const TagManagement: React.FC = () => {
   // 展开/收起子标签
   const handleExpand = (expanded: boolean, record: TagWithStats) => {
     if (expanded) {
-      // 收起其他标签，只展开当前标签
-      setExpandedRowKeys([record.id]);
+      // 添加到展开列表中，避免重复
+      setExpandedRowKeys(prev => {
+        if (!prev.includes(record.id)) {
+          return [...prev, record.id];
+        }
+        return prev;
+      });
     } else {
-      setExpandedRowKeys([]);
+      // 从展开列表中移除
+      setExpandedRowKeys(prev => prev.filter(key => key !== record.id));
     }
   };
 
@@ -194,7 +227,8 @@ const TagManagement: React.FC = () => {
         testName: `${randomGroupModal.tagName}_随机分组_${new Date().getTime()}`,
         groupCount: groupCount,
         splitRatio: Array(groupCount).fill(1 / groupCount),
-        groupNames: Array.from({ length: groupCount }, (_, i) => `分组${i + 1}`)
+        groupNames: Array.from({ length: groupCount }, (_, i) => `分组${i + 1}`),
+        isRegroup: randomGroupModal.isRegroup
       };
       
       await tagService.createSplitTest(randomGroupModal.tagId, splitData);
@@ -445,7 +479,16 @@ const TagManagement: React.FC = () => {
   // 子标签展开内容
   const expandedRowRender = (record: TagWithStats) => {
     if (!record.children || record.children.length === 0) {
-      return <p style={{ margin: 0, padding: 16, color: '#999' }}>暂无子标签</p>;
+      return (
+        <div style={{ 
+          padding: '16px 24px', 
+          textAlign: 'center',
+          color: '#999',
+          backgroundColor: '#fafafa'
+        }}>
+          暂无子标签
+        </div>
+      );
     }
 
     const subColumns: ColumnsType<TagTreeNode> = [
@@ -453,20 +496,22 @@ const TagManagement: React.FC = () => {
         title: '子标签名称',
         dataIndex: 'name',
         key: 'name',
-        render: (text: string, subRecord: TagTreeNode) => (
-          <Space>
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: subRecord.color || '#1677ff',
-                display: 'inline-block'
-              }}
-            />
-            {text}
-          </Space>
-        )
+        render: (text: string, subRecord: TagTreeNode) => {
+          return (
+            <Space>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: subRecord.color || '#52c41a',
+                  display: 'inline-block'
+                }}
+              />
+              <span style={{ fontWeight: 500 }}>{text}</span>
+            </Space>
+          );
+        }
       },
       {
         title: '联系人数',
@@ -492,14 +537,27 @@ const TagManagement: React.FC = () => {
     ];
 
     return (
-      <Table
-        columns={subColumns}
-        dataSource={record.children}
-        pagination={false}
-        size="small"
-        rowKey="id"
-        style={{ margin: '0 16px' }}
-      />
+      <div style={{ 
+        backgroundColor: '#f8f9fa', 
+        padding: '12px 24px', 
+        margin: '0 -16px',
+        borderLeft: '3px solid #1677ff'
+      }}>
+        <Table
+          columns={subColumns}
+          dataSource={record.children}
+          pagination={false}
+          size="middle"
+          rowKey="id"
+          showHeader={true}
+          style={{ 
+            backgroundColor: 'white',
+            borderRadius: '6px',
+            overflow: 'hidden'
+          }}
+          className="sub-table"
+        />
+      </div>
     );
   };
 
@@ -523,22 +581,39 @@ const TagManagement: React.FC = () => {
 
       <Table
         columns={columns}
-        dataSource={tags}
+        dataSource={tags.filter(tag => !tag.parentId)}
         loading={loading}
         rowKey="id"
         expandable={{
           expandedRowKeys,
           onExpand: handleExpand,
           expandedRowRender,
-          expandIcon: ({ expanded, onExpand, record }) => (
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined style={{ transform: expanded ? 'rotate(45deg)' : 'none' }} />}
-              onClick={(e) => onExpand(record, e)}
-              disabled={!record.children || record.children.length === 0}
-            />
-          )
+          expandIcon: ({ expanded, onExpand, record }) => {
+            const hasChildren = record.children && record.children.length > 0;
+            const isParentTag = !record.parentId; // 只有父标签才显示展开图标
+            
+            // 如果是子标签，不显示任何图标
+            if (!isParentTag) {
+              return null;
+            }
+            
+            return (
+              <Button
+                type="text"
+                size="small"
+                icon={<PlusOutlined style={{ 
+                  transform: expanded ? 'rotate(45deg)' : 'none',
+                  transition: 'transform 0.2s ease'
+                }} />}
+                onClick={(e) => onExpand(record, e)}
+                disabled={!hasChildren}
+                style={{ 
+                  opacity: hasChildren ? 1 : 0.3,
+                  cursor: hasChildren ? 'pointer' : 'not-allowed'
+                }}
+              />
+            );
+          }
         }}
         pagination={{
           showSizeChanger: true,

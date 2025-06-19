@@ -2,9 +2,9 @@ import axios from 'axios';
 
 // 根据环境确定API基础URL
 const getApiUrl = () => {
-  if (process.env.NODE_ENV === 'development') {
-    // 指向后端API服务器
-    return 'http://localhost:3000/api';
+  // 优先使用环境变量
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
   }
   // 生产环境使用相对路径
   return '/api';

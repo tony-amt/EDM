@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Avatar, Dropdown, theme } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Layout, Menu, Avatar, Dropdown, theme, Button, Space, Input } from 'antd';
 import { 
   UserOutlined, 
   TagOutlined, 
@@ -12,9 +12,14 @@ import {
   SendOutlined,
   CloudServerOutlined,
   UsergroupAddOutlined,
-  SettingOutlined
+  SettingOutlined,
+  MessageOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import NotificationCenter from '../components/notifications/NotificationCenter';
+import AdvancedSearch from '../components/conversations/AdvancedSearch';
+import webSocketService from '../services/websocket.service';
 
 const { Header, Sider, Content } = Layout;
 
@@ -23,6 +28,7 @@ const { Header, Sider, Content } = Layout;
  */
 const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -62,6 +68,24 @@ const AppLayout = () => {
 
   // 检查用户权限
   const isAdmin = user.role === 'admin';
+
+  // WebSocket连接管理 - 暂时禁用
+  useEffect(() => {
+    // 暂时禁用WebSocket连接，避免生产环境错误
+    console.log('WebSocket功能暂时禁用');
+    
+    // const token = localStorage.getItem('token');
+    // if (token && !webSocketService.isConnected()) {
+    //   webSocketService.connect(token);
+    //   webSocketService.requestNotificationPermission();
+    //   webSocketService.startHeartbeat();
+    // }
+
+    return () => {
+      // 组件卸载时断开连接
+      // webSocketService.disconnect();
+    };
+  }, []);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -105,6 +129,11 @@ const AppLayout = () => {
               key: '/templates',
               icon: <MailOutlined />,
               label: <Link to="/templates">模板管理</Link>,
+            },
+            {
+              key: '/conversations',
+              icon: <MessageOutlined />,
+              label: <Link to="/conversations">会话管理</Link>,
             },
             // V2.0 新增功能菜单
             {
@@ -168,12 +197,21 @@ const AppLayout = () => {
             })}
           </div>
           <div style={{ marginRight: 24 }}>
+            <Space>
+              <Button 
+                type="text" 
+                icon={<SearchOutlined />}
+                onClick={() => setSearchVisible(true)}
+                style={{ fontSize: '16px' }}
+              />
+              <NotificationCenter />
             <Dropdown menu={{ items: userMenu }} placement="bottomRight">
               <span style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} /> 
                 {!collapsed && <span style={{ marginLeft: 8 }}>{user.name || user.username || '用户'}</span>}
               </span>
           </Dropdown>
+            </Space>
           </div>
         </Header>
         <Content
@@ -188,6 +226,12 @@ const AppLayout = () => {
             <Outlet />
         </Content>
       </Layout>
+      
+      {/* 高级搜索模态框 */}
+      <AdvancedSearch 
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+      />
     </Layout>
   );
 };

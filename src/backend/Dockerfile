@@ -1,4 +1,5 @@
-FROM node:18-alpine
+# 使用Node.js 18版本
+FROM node:18
 
 WORKDIR /app
 

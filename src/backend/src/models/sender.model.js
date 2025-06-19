@@ -61,5 +61,15 @@ module.exports = (sequelize) => {
     ],
   });
 
+  // 定义关联关系
+  Sender.associate = function(models) {
+    // Sender 属于一个 User
+    Sender.belongsTo(models.User, {
+      foreignKey: 'user_id',
+      as: 'user',
+      onDelete: 'CASCADE'
+    });
+  };
+
   return Sender;
 }; 

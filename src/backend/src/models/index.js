@@ -148,8 +148,13 @@ sequelize.addHook('beforeBulkUpdate', (options) => {
   logger.debug(`Bulk updating in ${options.model.name} with where:`, options.where);
 });
 
+// 所有模型关联现在通过各模型的associate方法处理
+
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
+
+// 所有模型已通过自动加载添加到db对象中
+// EmailConversation和EmailMessage现在通过.model.js文件自动加载
 
 // 添加健康检查方法
 db.checkHealth = async () => {

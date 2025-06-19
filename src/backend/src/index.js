@@ -90,6 +90,34 @@ app.use('/api/tracking', trackingRoutes);
 // 已使用email-services路由替代
 app.use('/api/upload', uploadRoutes); // 添加上传路由
 
+// V2.0: Webhook和追踪增强路由
+try {
+  const webhookEnhancedRoutes = require('./routes/webhooks.routes');
+  app.use('/api/webhooks', webhookEnhancedRoutes);
+  console.log('✅ V2.0功能：增强Webhook路由已注册');
+} catch (error) {
+  console.warn('⚠️ V2.0功能：增强Webhook路由注册失败:', error.message);
+}
+
+// V2.0: 邮件会话管理路由
+try {
+  const emailConversationRoutes = require('./routes/emailConversation.routes');
+  app.use('/api/conversations', emailConversationRoutes);
+  console.log('✅ V2.0功能：邮件会话管理路由已注册');
+} catch (error) {
+  console.warn('⚠️ V2.0功能：邮件会话管理路由注册失败:', error.message);
+}
+
+// 仪表盘路由
+try {
+  const dashboardRoutes = require('./routes/dashboard.routes');
+  app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api', dashboardRoutes); // 支持 /api/users-v2/dashboard 路径
+  console.log('✅ 仪表盘路由已注册');
+} catch (error) {
+  console.warn('⚠️ 仪表盘路由注册失败:', error.message);
+}
+
 // 🔧 【V2.0新增功能】注册新增功能路由
 // V2.0发信服务管理
 try {
@@ -247,15 +275,19 @@ const startServer = async () => {
       logger.info('开发环境：检查数据库结构...');
       
       // 默认使用alter模式，保留现有数据，不使用强制重建
-      await db.sequelize.sync({ alter: true });
-      logger.info('数据库结构已更新，数据已保留');
+      // await db.sequelize.sync({ alter: true });
+      logger.info('数据库结构检查跳过（手动管理）');
       
       // 检查是否有管理员账户，没有则创建
       await ensureAdminExists();
     } else {
-      // 生产环境只检查连接，不自动修改表结构
-      await db.sequelize.sync({ alter: false });
-      logger.info('生产环境：数据库连接已验证');
+      // 生产环境：首次部署时创建表结构，后续使用alter模式
+      logger.info('生产环境：检查并创建数据库结构...');
+      // await db.sequelize.sync({ alter: true });
+      logger.info('生产环境：数据库结构跳过（手动管理）');
+      
+      // 确保管理员账户存在
+      await ensureAdminExists();
     }
 
     const PORT = config.server.port;

@@ -348,4 +348,22 @@ router.post('/:id/check-status', [
   validate
 ], TaskController.checkTaskStatus);
 
+/**
+ * V2.0: 手动更新任务统计数据
+ * POST /api/tasks/:id/update-stats
+ */
+router.post('/:id/update-stats', [
+  param('id')
+    .isUUID()
+    .withMessage('Valid task ID is required'),
+  
+  validate
+], TaskController.updateTaskStats);
+
+/**
+ * V2.0: 批量更新所有任务统计数据
+ * POST /api/tasks/batch-update-stats
+ */
+router.post('/batch-update-stats', TaskController.batchUpdateTaskStats);
+
 module.exports = router; 

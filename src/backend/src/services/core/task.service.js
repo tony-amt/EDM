@@ -468,21 +468,22 @@ class TaskService {
       // 获取收件人列表
       const contacts = await this.getTaskContacts(task);
       
-      // 获取任务关联的模板
-      const taskWithTemplates = await Task.findByPk(task.id, {
-        include: [{
-          model: sequelize.models.Template,
-          as: 'templates',
-          attributes: ['id', 'name', 'subject', 'body'],
-          through: { 
-            model: sequelize.models.TaskTemplate,
-            attributes: ['weight']
-          }
-        }]
+      // 🔧 V3.0修复：从JSONB字段获取模板ID，然后查询模板
+      const templateIds = task.templates || [];
+      if (!templateIds || templateIds.length === 0) {
+        throw new AppError('Task has no associated templates', 400);
+      }
+      
+      // 查询模板详情
+      const templates = await sequelize.models.Template.findAll({
+        where: {
+          id: templateIds
+        },
+        attributes: ['id', 'name', 'subject', 'body']
       });
       
-      if (!taskWithTemplates.templates || taskWithTemplates.templates.length === 0) {
-        throw new AppError('Task has no associated templates', 400);
+      if (!templates || templates.length === 0) {
+        throw new AppError('Task templates not found', 400);
       }
       
       // 获取发信人信息
@@ -495,7 +496,6 @@ class TaskService {
       const subTasks = [];
       for (const contact of contacts) {
         // 🔧 随机选择一个模板（可以根据权重选择）
-        const templates = taskWithTemplates.templates;
         const randomIndex = Math.floor(Math.random() * templates.length);
         const selectedTemplate = templates[randomIndex];
         
@@ -522,7 +522,6 @@ class TaskService {
       for (let i = 0; i < createdSubTasks.length; i++) {
         const subTask = createdSubTasks[i];
         const contact = contacts[i];
-        const templates = taskWithTemplates.templates;
         const randomIndex = Math.floor(Math.random() * templates.length);
         const selectedTemplate = templates[randomIndex];
         
@@ -739,10 +738,13 @@ class TaskService {
     //   });
     // }
 
+    // 转换图片URL为邮件图片代理URL
+    rendered = this.convertImageUrls(rendered);
+
     // V2.0: 如果提供了subTaskId，插入跟踪功能
     if (subTaskId) {
       // 1. 在邮件末尾插入跟踪像素
-      const trackingPixel = `<img src="${process.env.APP_URL || 'http://localhost:3000'}/api/track/open/${subTaskId}.png" width="1" height="1" style="display:none;" alt="" />`;
+      const trackingPixel = `<img src="${process.env.APP_URL || 'http://tkmail.fun'}/api/tracking/open/${subTaskId}" width="1" height="1" style="display:none;" alt="" />`;
       
       // 如果是HTML邮件，在</body>前插入跟踪像素
       if (rendered.includes('</body>')) {
@@ -760,6 +762,38 @@ class TaskService {
   }
 
   /**
+   * 转换图片URL为邮件图片代理URL
+   */
+  convertImageUrls(htmlContent) {
+    const baseUrl = process.env.APP_URL || 'http://tkmail.fun';
+    
+    // 匹配所有的img标签
+    const imgRegex = /<img\s+([^>]*?)src\s*=\s*["']([^"']*?)["']([^>]*?)>/gi;
+    
+    return htmlContent.replace(imgRegex, (match, beforeSrc, originalSrc, afterSrc) => {
+      // 如果已经是完整URL，不需要转换
+      if (originalSrc.startsWith('http://') || originalSrc.startsWith('https://') || originalSrc.startsWith('data:')) {
+        return match;
+      }
+      
+      // 如果是相对路径的上传图片，转换为邮件图片代理URL
+      if (originalSrc.startsWith('/uploads/') || originalSrc.includes('uploads/')) {
+        const filename = originalSrc.split('/').pop();
+        const proxyUrl = `${baseUrl}/api/upload/email-image/${filename}`;
+        return `<img ${beforeSrc}src="${proxyUrl}"${afterSrc}>`;
+      }
+      
+      // 如果是其他相对路径，转换为完整URL
+      if (originalSrc.startsWith('/')) {
+        const fullUrl = `${baseUrl}${originalSrc}`;
+        return `<img ${beforeSrc}src="${fullUrl}"${afterSrc}>`;
+      }
+      
+      return match;
+    });
+  }
+
+  /**
    * V2.0: 为邮件中的链接添加点击跟踪
    */
   addClickTracking(htmlContent, subTaskId) {
@@ -768,12 +802,12 @@ class TaskService {
     
     return htmlContent.replace(linkRegex, (match, beforeHref, originalUrl, afterHref) => {
       // 跳过已经是跟踪链接的URL
-      if (originalUrl.includes('/track/click/') || originalUrl.includes('mailto:') || originalUrl.includes('tel:')) {
+      if (originalUrl.includes('/tracking/click/') || originalUrl.includes('mailto:') || originalUrl.includes('tel:')) {
         return match;
       }
 
       // 为原始URL生成跟踪链接
-      const trackingUrl = `${process.env.APP_URL || 'http://localhost:3000'}/api/track/click/${subTaskId}/${encodeURIComponent(originalUrl)}`;
+      const trackingUrl = `${process.env.APP_URL || 'http://tkmail.fun'}/api/tracking/click/${subTaskId}/${encodeURIComponent(originalUrl)}`;
       
       // 在原始链接上添加data属性，方便后续解析
       return `<a ${beforeHref}href="${trackingUrl}" data-original-url="${originalUrl}"${afterHref}>`;
@@ -976,7 +1010,7 @@ class TaskService {
           id: template.id,
           name: template.name,
           subject: template.subject,
-          weight: template.TaskTemplate?.weight || 1
+          weight: 1 // V3.0不再使用TaskTemplate关联表，统一使用默认权重
         }));
         output.template_ids = task.templates.map(template => template.id);
       } else {
@@ -1016,13 +1050,9 @@ class TaskService {
         created_by: userId 
       },
       include: [{
-        model: sequelize.models.Template,
-        as: 'templates',
-        attributes: ['id', 'name', 'subject'],
-        through: { 
-          model: sequelize.models.TaskTemplate,
-          attributes: ['weight']
-        }
+        model: sequelize.models.Sender,
+        as: 'sender',
+        attributes: ['id', 'name']
       }]
     });
 
@@ -1080,7 +1110,7 @@ class TaskService {
 
       await task.update(updateFields, { transaction });
 
-      // 🔧 处理模板关联更新
+      // 🔧 处理模板关联更新（V3.0使用JSONB字段）
       if (updateData.template_ids && Array.isArray(updateData.template_ids)) {
         // 验证模板是否属于用户
         await this.validateTaskDependenciesV3(userId, { 
@@ -1088,20 +1118,8 @@ class TaskService {
           template_ids: updateData.template_ids 
         });
 
-        // 删除现有的模板关联
-        await sequelize.models.TaskTemplate.destroy({
-          where: { task_id: taskId },
-          transaction
-        });
-
-        // 创建新的模板关联
-        const taskTemplates = updateData.template_ids.map(templateId => ({
-          task_id: taskId,
-          template_id: templateId,
-          weight: 1 // 默认权重
-        }));
-
-        await sequelize.models.TaskTemplate.bulkCreate(taskTemplates, { transaction });
+        // 更新templates JSONB字段
+        updateFields.templates = updateData.template_ids;
       }
 
       await transaction.commit();

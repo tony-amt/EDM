@@ -63,11 +63,11 @@ module.exports = {
     }
   },
   production: {
-    username: process.env.DB_USER_PROD,
-    password: process.env.DB_PASSWORD_PROD,
-    database: process.env.DB_NAME_PROD,
-    host: process.env.DB_HOST_PROD,
-    port: parseInt(process.env.DB_PORT_PROD, 10),
+    username: process.env.DB_USER || 'edm_user',
+    password: process.env.DB_PASSWORD || 'edm_secure_2025_tk',
+    database: process.env.DB_NAME || 'amt_mail_system',
+    host: process.env.DB_HOST || 'postgres',
+    port: parseInt(process.env.DB_PORT, 10) || 5432,
     dialect: 'postgres',
     logging: false, // Or a custom logger for production
     dialectOptions: {

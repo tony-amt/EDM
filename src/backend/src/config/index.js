@@ -87,8 +87,8 @@ const config = {
 const environmentConfigs = {
   development: {
     // 开发环境特定配置，例如更详细的日志
-    database: {
-        ...config.database, // 继承基础数据库配置
+    postgres: {
+        ...config.postgres, // 继承基础数据库配置
         logging: console.log, // 开发时显示SQL日志
     }
   },
@@ -97,13 +97,20 @@ const environmentConfigs = {
         ...config.server,
         port: parseInt(process.env.BACKEND_PORT_TEST, 10) || 3000, // 测试环境也使用 3000 或专用环境变量
     },
-    database: {
+    postgres: {
         host: process.env.DB_HOST_TEST || 'localhost', // 测试通常连接本地或特定测试DB
         port: parseInt(process.env.DB_PORT_TEST, 10) || 5432,
         username: process.env.DB_USER_TEST || 'postgres',
         password: process.env.DB_PASSWORD_TEST || 'password',
-        name: process.env.DB_NAME_TEST || 'amt_mail_test',
+        database: process.env.DB_NAME_TEST || 'amt_mail_test',
+        dialect: 'postgres',
         logging: false, // 测试时通常关闭SQL日志
+        pool: {
+          max: 5,
+          min: 0,
+          acquire: 30000,
+          idle: 10000
+        }
     },
     // 测试环境可以有自己的JWT密钥或CORS设置，如果需要隔离
   },
@@ -111,22 +118,26 @@ const environmentConfigs = {
     // 生产环境特定配置，例如SSL，更严格的安全设置
     server: {
         ...config.server,
-        port: parseInt(process.env.BACKEND_PORT_PROD, 10) || 8080, // 生产环境通常使用不同端口
+        port: parseInt(process.env.PORT, 10) || parseInt(process.env.BACKEND_PORT, 10) || 8080, // 生产环境通常使用不同端口
     },
     cors: {
         ...config.cors,
-        origin: process.env.CORS_ORIGIN_PROD ? process.env.CORS_ORIGIN_PROD.split(',') : ['https://your-production-domain.com'], // 生产环境的CORS源
+        origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['https://tkmail.fun', 'http://tkmail.fun'], // 生产环境的CORS源
     },
-    // 生产数据库配置应通过环境变量严格管理
-    database: {
-        host: process.env.DB_HOST_PROD,
-        port: parseInt(process.env.DB_PORT_PROD, 10),
-        username: process.env.DB_USER_PROD,
-        password: process.env.DB_PASSWORD_PROD,
-        name: process.env.DB_NAME_PROD,
+    // 生产数据库配置使用Docker环境变量
+    postgres: {
+        host: process.env.DB_HOST || 'postgres',
+        port: parseInt(process.env.DB_PORT, 10) || 5432,
+        username: process.env.DB_USER || 'edm_user',
+        password: process.env.DB_PASSWORD || 'edm_secure_2025_tk',
+        database: process.env.DB_NAME || 'amt_mail_system',
+        dialect: 'postgres',
         logging: false, 
-        dialectOptions: {
-            ssl: { require: true, rejectUnauthorized: true } // 生产环境强制SSL
+        pool: {
+          max: 5,
+          min: 0,
+          acquire: 30000,
+          idle: 10000
         }
     },
   },
@@ -134,9 +145,9 @@ const environmentConfigs = {
 
 const finalConfig = { ...config, ...environmentConfigs[env] };
 
-// 如果特定环境的配置（如 database）也是对象，需要深度合并
-if (environmentConfigs[env] && typeof environmentConfigs[env].database === 'object') {
-  finalConfig.database = { ...config.database, ...environmentConfigs[env].database };
+// 如果特定环境的配置（如 postgres）也是对象，需要深度合并
+if (environmentConfigs[env] && typeof environmentConfigs[env].postgres === 'object') {
+  finalConfig.postgres = { ...config.postgres, ...environmentConfigs[env].postgres };
 }
 if (environmentConfigs[env] && typeof environmentConfigs[env].server === 'object') {
   finalConfig.server = { ...config.server, ...environmentConfigs[env].server };

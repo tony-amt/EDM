@@ -20,6 +20,7 @@ class QueueScheduler {
     this.taskQueues = new Map(); // 任务队列映射 taskId -> queue
     this.userTaskRotation = new Map(); // 用户任务轮询索引 userId -> taskIndex
     this.serviceTimers = new Map(); // 发信服务定时器 serviceId -> timer
+    this.scheduledTaskTimer = null; // 新增：scheduled任务检查定时器
     this.isRunning = false;
   }
 
@@ -109,6 +110,9 @@ class QueueScheduler {
       // 2. 启动发信服务轮询
       await this.startServicePolling();
 
+      // 3. 启动scheduled任务检查定时器
+      this.startScheduledTaskTimer();
+
       logger.info('✅ 队列调度器启动完成');
     } catch (error) {
       logger.error('队列调度器启动失败:', error);
@@ -126,6 +130,13 @@ class QueueScheduler {
     for (const [serviceId, timer] of this.serviceTimers) {
       clearInterval(timer);
       logger.info(`停止发信服务 ${serviceId} 的轮询定时器`);
+    }
+    
+    // 停止scheduled任务检查定时器
+    if (this.scheduledTaskTimer) {
+      clearInterval(this.scheduledTaskTimer);
+      this.scheduledTaskTimer = null;
+      logger.info('停止scheduled任务检查定时器');
     }
     
     this.serviceTimers.clear();
@@ -800,42 +811,47 @@ class QueueScheduler {
    * 标记SubTask为已发送
    */
   async markSubTaskSent(subTaskId) {
-    await SubTask.update({
+    const subTask = await SubTask.findByPk(subTaskId);
+    if (!subTask) return;
+
+    await subTask.update({
       status: 'sent',
       sent_at: new Date()
-    }, {
-      where: { id: subTaskId }
     });
 
-    // 检查任务是否完成
-    const subTask = await SubTask.findByPk(subTaskId);
-    if (subTask) {
-      await this.checkTaskCompletion(subTask.task_id);
-    }
+    // 更新任务统计
+    await this.updateTaskStats(subTask.task_id);
+
+    logger.info(`✅ SubTask ${subTaskId} 标记为已发送`);
   }
 
   /**
    * 标记SubTask为失败
    */
   async markSubTaskFailed(subTaskId, errorMessage) {
-    await SubTask.update({
+    const subTask = await SubTask.findByPk(subTaskId);
+    if (!subTask) return;
+
+    await subTask.update({
       status: 'failed',
-      error_message: errorMessage
-    }, {
-      where: { id: subTaskId }
+      error_message: errorMessage,
+      retry_count: subTask.retry_count + 1
     });
 
-    const subTask = await SubTask.findByPk(subTaskId);
-    if (subTask) {
-      await this.checkTaskCompletion(subTask.task_id);
-    }
+    // 更新任务统计
+    await this.updateTaskStats(subTask.task_id);
+
+    logger.error(`❌ SubTask ${subTaskId} 标记为失败: ${errorMessage}`);
   }
 
   /**
-   * 检查任务是否完成
+   * 更新任务统计信息
    */
-  async checkTaskCompletion(taskId) {
-    const stats = await SubTask.findAll({
+  async updateTaskStats(taskId) {
+    const task = await Task.findByPk(taskId);
+    if (!task) return;
+
+    const statusStats = await SubTask.findAll({
       where: { task_id: taskId },
       attributes: [
         'status',
@@ -845,16 +861,81 @@ class QueueScheduler {
       raw: true
     });
 
-    const statusCounts = {};
-    let totalCount = 0;
-    stats.forEach(stat => {
-      statusCounts[stat.status] = parseInt(stat.count);
-      totalCount += parseInt(stat.count);
+    const stats = {
+      total_recipients: 0,
+      pending: 0,
+      allocated: 0,
+      sending: 0,
+      sent: 0,
+      delivered: 0,
+      bounced: 0,
+      opened: 0,
+      clicked: 0,
+      failed: 0
+    };
+
+    let pendingCount = 0;
+    let allocatedCount = 0;
+
+    statusStats.forEach(stat => {
+      const count = parseInt(stat.count);
+      stats[stat.status] = count;
+      stats.total_recipients += count;
+      
+      if (stat.status === 'pending') {
+        pendingCount += count;
+      } else if (['allocated', 'sending', 'sent', 'delivered'].includes(stat.status)) {
+        allocatedCount += count;
+      }
     });
 
-    const pendingCount = statusCounts.pending || 0;
-    const sentCount = statusCounts.sent || 0;
-    const failedCount = statusCounts.failed || 0;
+    // 更新任务的统计字段
+    await task.update({ 
+      summary_stats: stats,
+      total_subtasks: stats.total_recipients,
+      pending_subtasks: pendingCount,
+      allocated_subtasks: allocatedCount
+    });
+
+    logger.info(`📊 任务 ${taskId} 统计更新: ${JSON.stringify(stats)}`);
+
+    // 检查任务是否完成
+    await this.checkTaskCompletion(taskId, stats);
+  }
+
+  /**
+   * 检查任务是否完成
+   */
+  async checkTaskCompletion(taskId, stats = null) {
+    if (!stats) {
+      // 如果没有传入统计数据，重新获取
+      const statusStats = await SubTask.findAll({
+      where: { task_id: taskId },
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['status'],
+      raw: true
+    });
+
+      stats = {
+        pending: 0,
+        sent: 0,
+        failed: 0,
+        total_recipients: 0
+      };
+
+      statusStats.forEach(stat => {
+        const count = parseInt(stat.count);
+        stats[stat.status] = count;
+        stats.total_recipients += count;
+    });
+    }
+
+    const pendingCount = stats.pending || 0;
+    const sentCount = stats.sent || 0;
+    const failedCount = stats.failed || 0;
 
     let newStatus = 'sending';
     if (pendingCount === 0) {
@@ -863,6 +944,8 @@ class QueueScheduler {
       
       // 从队列中移除
       this.taskQueues.delete(taskId);
+      
+      logger.info(`🎉 任务 ${taskId} 已完成，状态: ${newStatus}`);
     }
 
     await Task.update({
@@ -942,6 +1025,32 @@ class QueueScheduler {
         sum + (q.subTasks.length - q.currentIndex), 0
       )
     };
+  }
+
+  /**
+   * 启动scheduled任务检查定时器
+   */
+  startScheduledTaskTimer() {
+    // 每30秒检查一次scheduled任务
+    const intervalMs = 30 * 1000;
+    
+    this.scheduledTaskTimer = setInterval(async () => {
+      if (!this.isRunning) {
+        clearInterval(this.scheduledTaskTimer);
+        return;
+      }
+
+      try {
+        const result = await this.processScheduledTasks();
+        if (result.processed > 0) {
+          logger.info(`自动处理了 ${result.processed} 个scheduled任务`);
+        }
+      } catch (error) {
+        logger.error('scheduled任务自动检查失败:', error);
+      }
+    }, intervalMs);
+
+    logger.info('scheduled任务检查定时器启动，间隔: 30秒');
   }
 }
 

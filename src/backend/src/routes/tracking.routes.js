@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const trackingController = require('../controllers/tracking.controller');
+const catchAsync = require('../utils/catchAsync');
+const logger = require('../utils/logger');
 // Add any necessary middleware, e.g., for validating UUIDs if needed
 // const { validateParamUUID } = require('../middleware/validators'); 
 
@@ -80,6 +82,13 @@ router.get('/open/:subTaskId', trackingController.trackEmailOpen.bind(trackingCo
  */
 router.get('/click/:subTaskId', trackingController.trackEmailClick.bind(trackingController));
 
+// 支持URL参数的点击跟踪路由
+router.get('/click/:subTaskId/:encodedUrl', (req, res) => {
+  // 将编码的URL作为查询参数传递给trackEmailClick
+  req.query.url = decodeURIComponent(req.params.encodedUrl);
+  trackingController.trackEmailClick.bind(trackingController)(req, res);
+});
+
 /**
  * @swagger
  * /track/analytics/{taskId}:
@@ -155,5 +164,71 @@ router.get('/v2/open/:subTaskId', trackingController.trackOpen.bind(trackingCont
 router.get('/v2/click/:subTaskId/:linkIdentifier', trackingController.trackClick.bind(trackingController));
 router.get('/v2/analytics/:taskId', trackingController.getTaskAnalytics.bind(trackingController));
 router.get('/v2/subtask/:subTaskId/status', trackingController.getSubTaskStatus.bind(trackingController));
+
+/**
+ * 接收邮件状态更新
+ * POST /api/tracking/email-status
+ */
+router.post('/email-status', catchAsync(async (req, res) => {
+  const {
+    message_id,
+    email,
+    status,
+    timestamp,
+    reason,
+    source = 'system'
+  } = req.body;
+
+  logger.info('📊 邮件状态更新', {
+    message_id,
+    email,
+    status,
+    source,
+    reason
+  });
+
+  // TODO: 这里可以添加到数据库记录邮件状态
+  // 目前先记录日志
+  
+  res.json({
+    success: true,
+    message: '邮件状态更新记录成功',
+    data: {
+      message_id,
+      email,
+      status,
+      timestamp: timestamp || new Date().toISOString()
+    }
+  });
+}));
+
+/**
+ * 获取追踪统计
+ * GET /api/tracking/stats
+ */
+router.get('/stats', catchAsync(async (req, res) => {
+  const { message_id, email, campaign_id } = req.query;
+
+  // TODO: 从追踪服务获取统计数据
+  const mockStats = {
+    message_id,
+    email,
+    campaign_id,
+    stats: {
+      sent: 1,
+      delivered: 1,
+      opened: 0,
+      clicked: 0,
+      bounced: 0,
+      complained: 0
+    },
+    last_updated: new Date().toISOString()
+  };
+
+  res.json({
+    success: true,
+    data: mockStats
+  });
+}));
 
 module.exports = router; 

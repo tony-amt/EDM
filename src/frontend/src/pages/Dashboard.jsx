@@ -28,56 +28,16 @@ const Dashboard = () => {
       
       console.log('开始获取Dashboard数据...');
       
-      // 🔧 修复API调用，使用正确的端点和数据格式
-      const responses = await Promise.allSettled([
-        // 获取联系人统计
-        axios.get(`${API_URL}/contacts`, { params: { limit: 1 } }),
-        // 获取标签数量
-        axios.get(`${API_URL}/tags`, { params: { limit: 1 } }),
-        // 获取模板数量
-        axios.get(`${API_URL}/templates`, { params: { limit: 1 } }),
-        // 获取任务数量
-        axios.get(`${API_URL}/tasks`, { params: { limit: 1 } }),
-        // 获取最新联系人
-        axios.get(`${API_URL}/contacts`, { params: { limit: 5, sort: 'created_at', order: 'desc' } })
-      ]);
+      // 🔧 使用统一的仪表盘API
+      const response = await axios.get(`${API_URL}/dashboard/stats`);
+      
+      console.log('仪表盘API响应:', response.data);
 
-      console.log('API响应结果:', responses);
-
-      const newStats = { ...stats };
-
-      // 处理联系人数量
-      if (responses[0].status === 'fulfilled') {
-        const contactData = responses[0].value.data;
-        newStats.contacts = contactData.pagination?.total || contactData.total || 0;
+      if (response.data.success) {
+        setStats(response.data.data);
+      } else {
+        throw new Error(response.data.message || '获取仪表盘数据失败');
       }
-
-      // 处理标签数量
-      if (responses[1].status === 'fulfilled') {
-        const tagData = responses[1].value.data;
-        newStats.tags = tagData.pagination?.total || tagData.total || (tagData.data?.length || 0);
-      }
-
-      // 处理模板数量
-      if (responses[2].status === 'fulfilled') {
-        const templateData = responses[2].value.data;
-        newStats.templates = templateData.pagination?.total || templateData.total || (templateData.data?.length || 0);
-      }
-
-      // 处理任务数量
-      if (responses[3].status === 'fulfilled') {
-        const taskData = responses[3].value.data;
-        newStats.tasks = taskData.pagination?.total || taskData.total || (taskData.data?.length || 0);
-      }
-
-      // 处理最新联系人
-      if (responses[4].status === 'fulfilled') {
-        const recentData = responses[4].value.data;
-        newStats.recentContacts = recentData.data || [];
-      }
-
-      console.log('处理后的统计数据:', newStats);
-      setStats(newStats);
       
     } catch (error) {
       console.error('获取仪表盘数据错误:', error);
