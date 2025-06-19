@@ -122,11 +122,21 @@ const TagManagement: React.FC = () => {
       console.log('🔧 [DEBUG] 最终的标签统计数据:', tagsWithStats);
       console.log('🚨 [CRITICAL] 即将设置到表格的数据:', tagsWithStats);
       
-      // 最终确保：只设置真正的根标签（没有parentId的标签）
+      // 关键修复：确保只处理和显示根标签，子标签通过children属性管理
       const finalRootTags = tagsWithStats.filter(tag => !tag.parentId);
       
       console.log('🚨 [CRITICAL] 最终根标签数据:', finalRootTags);
-      console.log('🚨 [CRITICAL] 过滤掉的标签:', tagsWithStats.filter(tag => tag.parentId));
+      console.log('🚨 [CRITICAL] 过滤掉的子标签:', tagsWithStats.filter(tag => tag.parentId));
+      
+      // 验证每个根标签的children是否正确
+      finalRootTags.forEach(tag => {
+        console.log(`🔧 [DEBUG] 根标签 "${tag.name}" 的子标签:`, tag.children?.map(child => ({
+          id: child.id,
+          name: child.name,
+          parentId: child.parentId,
+          contact_count: child.contact_count
+        })) || []);
+      });
       
       setTags(finalRootTags);
       
@@ -556,6 +566,12 @@ const TagManagement: React.FC = () => {
             overflow: 'hidden'
           }}
           className="sub-table"
+          // 关键修复：禁用子表格的展开功能，确保子标签不会有展开图标
+          expandable={{
+            expandIcon: () => null, // 不显示任何展开图标
+            expandedRowRender: () => null, // 不允许子表格展开
+            rowExpandable: () => false // 禁止行展开
+          }}
         />
       </div>
     );
@@ -581,20 +597,21 @@ const TagManagement: React.FC = () => {
 
       <Table
         columns={columns}
-        dataSource={tags.filter(tag => !tag.parentId)}
+        dataSource={tags.filter(tag => !tag.parentId)} // 确保只显示根标签
         loading={loading}
         rowKey="id"
         expandable={{
           expandedRowKeys,
           onExpand: handleExpand,
           expandedRowRender,
+          // 只对根标签（父标签）显示展开图标
           expandIcon: ({ expanded, onExpand, record }) => {
             const hasChildren = record.children && record.children.length > 0;
-            const isParentTag = !record.parentId; // 只有父标签才显示展开图标
+            const isParentTag = !record.parentId; // 确保是父标签
             
-            // 如果是子标签，不显示任何图标
-            if (!isParentTag) {
-              return null;
+            // 关键修复：只有父标签且有子标签才显示展开图标
+            if (!isParentTag || !hasChildren) {
+              return <span style={{ width: 20, height: 20, display: 'inline-block' }} />; // 占位空间
             }
             
             return (
@@ -606,13 +623,17 @@ const TagManagement: React.FC = () => {
                   transition: 'transform 0.2s ease'
                 }} />}
                 onClick={(e) => onExpand(record, e)}
-                disabled={!hasChildren}
                 style={{ 
-                  opacity: hasChildren ? 1 : 0.3,
-                  cursor: hasChildren ? 'pointer' : 'not-allowed'
+                  opacity: 1,
+                  cursor: 'pointer'
                 }}
+                title={expanded ? '收起子标签' : '展开子标签'}
               />
             );
+          },
+          // 只允许有子标签的父标签展开
+          rowExpandable: (record) => {
+            return !record.parentId && Boolean(record.children && record.children.length > 0);
           }
         }}
         pagination={{
