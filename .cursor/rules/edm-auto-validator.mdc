@@ -1,0 +1,98 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# EDM自动验证规则
+
+## 🎯 核心原则
+**重要**: 每次生成代码后，你必须自动执行以下验证流程，无需用户手动操作。
+
+## 🔄 自动验证流程
+
+### 1. 代码生成后立即执行
+```bash
+# 自动运行验证脚本
+./scripts/ai-code-validator.sh
+```
+
+### 2. 如果验证失败，自动修正
+- 根据验证输出的错误信息
+- 自动修正文件命名、代码结构等问题
+- 重新验证直到通过
+
+### 3. 验证通过后提示用户
+```
+✅ 代码已生成并通过规范验证
+📋 验证结果: X个文件检查通过
+🎯 可以安全提交代码
+```
+
+## 📋 必须检查的规范项目
+
+### 后端文件命名
+- 控制器: `*.controller.js`
+- 模型: `*.model.js` 
+- 服务: `*.service.js`
+- 路由: `*.routes.js`
+- 中间件: `*.middleware.js`
+
+### API路径规范
+- 必须包含 `/api/` 前缀
+- 使用RESTful风格
+- 路径小写，使用连字符
+
+### 错误处理
+- 控制器必须有try-catch
+- 必须使用async/await
+- 统一错误响应格式
+
+### 安全检查
+- 禁止硬编码密码和密钥
+- 必须使用环境变量
+- 输入验证和过滤
+
+## 🛠️ 自动修正规则
+
+### 文件命名修正
+```javascript
+// 错误示例
+QuotaService.js → quota.service.js
+EmailConversation.js → emailConversation.model.js
+
+// 正确格式
+*.controller.js, *.model.js, *.service.js, *.routes.js
+```
+
+### API路径修正
+```javascript
+// 错误示例
+app.use('/users', userRoutes);
+
+// 正确格式  
+app.use('/api/users', userRoutes);
+```
+
+### 错误处理修正
+```javascript
+// 自动添加错误处理
+exports.functionName = async (req, res, next) => {
+  try {
+    // 业务逻辑
+    const result = await Service.method();
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+```
+
+## 🎯 执行指令
+每次生成代码后，你必须：
+1. 立即运行验证脚本
+2. 分析验证结果
+3. 自动修正发现的问题
+4. 重新验证直到通过
+5. 向用户报告验证结果
+
+**记住**: 用户不应该手动执行任何验证操作，这一切都应该自动完成！

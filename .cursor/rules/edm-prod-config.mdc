@@ -1,0 +1,12 @@
+---
+description: 当需要检查生产服务器时候可参考配置，或者是线上修改bug时候参考配置，生产服务器禁止自动化高危动作（批量删除）
+globs: 
+alwaysApply: false
+---
+生产配置：
+-IP：43.135.38.15
+-账号：ubuntu
+-密码：Tony1231!
+-项目路径：/opt/edm
+-数据库名称：amt_mail_system
+*授权你直接通过sshpass来review生产文件，非敏感操作（删除）不需要等待我来启动，不需要等待我来输入密码*

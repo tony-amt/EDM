@@ -1,0 +1,160 @@
+---
+description: 
+globs: *.tsx,*.jsx,*.ts,*.css,src/frontend/src/**/*
+alwaysApply: false
+---
+# EDM前端开发规则
+
+## 🎯 前端技术栈
+- **框架**: React 18 + TypeScript
+- **UI库**: Ant Design
+- **状态管理**: React Context + Hooks
+- **路由**: React Router v6
+- **构建工具**: Vite/Webpack
+- **样式**: CSS + Less
+
+## 📁 前端实际目录结构
+```
+src/frontend/src/
+├── components/         # 可复用组件
+├── pages/             # 页面组件 (.tsx, .jsx)
+├── services/          # API服务层 (.ts)
+├── types/             # TypeScript类型定义 (.ts)
+├── hooks/             # 自定义React Hooks (.ts)
+├── utils/             # 前端工具函数 (.ts)
+├── contexts/          # React Context (.tsx)
+├── layouts/           # 布局组件 (.jsx, .tsx)
+├── store/             # 状态管理 (.ts)
+├── config/            # 配置文件 (.ts)
+└── assets/            # 静态资源
+```
+
+## 🔥 前端热更新开发流程 (必须遵循)
+
+### 开发环境启动
+```bash
+# 构建开发镜像
+cd src/frontend
+docker build -f Dockerfile.dev -t edm-frontend:dev .
+
+# 启动开发容器（支持热更新）
+docker run -d \
+  --name edm-frontend-debug \
+  --network edm_edm-debug-network \
+  -p 3003:3001 \
+  -v "$(pwd)/src/frontend/src:/app/src" \
+  -v "$(pwd)/src/frontend/public:/app/public" \
+  edm-frontend:dev
+```
+
+### 生产环境快速部署
+```bash
+# 使用自动化部署脚本
+./scripts/deploy-frontend.sh [版本号]
+
+# 手动部署流程
+cd src/frontend
+docker build -f Dockerfile.prod -t edm-frontend:v1.x --platform linux/amd64 .
+docker save edm-frontend:v1.x | gzip > edm-frontend-v1.x.tar.gz
+scp edm-frontend-v1.x.tar.gz ubuntu@43.135.38.15:~/
+```
+
+### 404问题根治方案 (生产环境必须)
+生产环境Dockerfile.prod中必须包含正确的nginx配置：
+```dockerfile
+# 配置nginx支持React SPA路由
+RUN echo 'server {' > /etc/nginx/conf.d/default.conf && \
+  echo '    listen 80;' >> /etc/nginx/conf.d/default.conf && \
+  echo '    server_name localhost;' >> /etc/nginx/conf.d/default.conf && \
+  echo '    root /usr/share/nginx/html;' >> /etc/nginx/conf.d/default.conf && \
+  echo '    index index.html index.htm;' >> /etc/nginx/conf.d/default.conf && \
+  echo '    location / {' >> /etc/nginx/conf.d/default.conf && \
+  echo '        try_files $uri $uri/ /index.html;' >> /etc/nginx/conf.d/default.conf && \
+  echo '    }' >> /etc/nginx/conf.d/default.conf && \
+  echo '}' >> /etc/nginx/conf.d/default.conf
+```
+
+## 🛠️ 前端开发规范
+- **组件命名**: PascalCase (如: `ContactList.tsx`)
+- **文件扩展名**: 
+  - React组件: `.tsx` (TypeScript) 或 `.jsx` (JavaScript)
+  - 工具类: `.ts` (TypeScript)
+  - 样式: `.css`
+- **类型定义**: 必须使用TypeScript严格模式
+- **状态管理**: 优先使用React Hooks，复杂状态用Context
+- **API调用**: 统一使用`services/`目录中的API服务
+- **错误处理**: 使用ErrorBoundary + 统一错误提示
+
+## 🎨 UI/UX规范
+- **设计系统**: 严格遵循Ant Design设计规范
+- **响应式**: 支持移动端和桌面端
+- **主题色**: 主色调#1890ff，成功#52c41a，警告#faad14，错误#ff4d4f
+- **间距**: 使用8px网格系统
+- **字体**: 系统字体栈，14px基础字号
+
+## 🔧 常用组件模式
+```typescript
+// 标准TypeScript组件结构
+interface Props {
+  // 类型定义
+}
+
+const ComponentName: React.FC<Props> = ({ prop1, prop2 }) => {
+  // Hooks
+  // 事件处理
+  // 渲染逻辑
+  return <div>...</div>;
+};
+
+export default ComponentName;
+```
+
+```javascript
+// 标准JavaScript组件结构 (.jsx)
+const ComponentName = ({ prop1, prop2 }) => {
+  // Hooks
+  // 事件处理
+  // 渲染逻辑
+  return <div>...</div>;
+};
+
+export default ComponentName;
+```
+
+## 📋 前端检查清单
+- [ ] 组件有正确的类型定义 (TypeScript)
+- [ ] 使用Ant Design组件库
+- [ ] 响应式设计适配
+- [ ] 错误边界处理
+- [ ] API调用错误处理
+- [ ] 加载状态显示
+- [ ] 数据验证和格式化
+- [ ] 开发环境支持热更新
+- [ ] 生产环境nginx配置正确
+
+## 🚀 前端命令
+```bash
+cd src/frontend
+npm run dev             # 启动开发服务器
+npm run build           # 构建生产版本
+npm run test            # 运行测试
+npm run lint            # 代码检查
+npm run type-check      # TypeScript类型检查
+
+# Docker开发环境
+docker logs -f edm-frontend-debug    # 查看开发容器日志
+docker restart edm-frontend-debug    # 重启开发容器
+
+# 生产部署
+./scripts/deploy-frontend.sh         # 快速部署
+curl -I https://tkmail.fun/tags     # 验证部署结果
+```
+
+## 📂 实际文件示例
+- **页面组件**: `pages/contacts/ContactList.tsx`
+- **布局组件**: `layouts/AppLayout.jsx`
+- **API服务**: `services/api.ts`
+- **类型定义**: `types/api.ts`
+- **工具函数**: `utils/axios.ts`
+- **状态管理**: `store/index.ts`
+- **配置文件**: `config/index.ts`

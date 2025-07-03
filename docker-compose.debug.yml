@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL数据库服务
+  postgres-debug:
+    image: postgres:14
+    platform: linux/amd64
+    container_name: edm-postgres-debug
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amt_mail_system
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./db_init_scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d amt_mail_system" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # 后端API服务 - 使用现有镜像
+  backend-debug:
+    image: edm-backend-debug:latest
+    container_name: edm-backend-debug
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: postgres-debug
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis-debug
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_KEY_PREFIX: "edm:"
+      JWT_SECRET: RXRmasE4X32fkDEwAbDiKzE7NyjPfWtC
+      JWT_EXPIRES_IN: 24h
+      DB_FORCE_SYNC: false
+      SCHEDULER_ENABLED: true
+      SCHEDULER_INTERVAL: 1000
+      MAX_CONCURRENT_CAMPAIGNS: 5
+      EMAIL_SEND_RATE_LIMIT: 100
+      QUEUE_NAME: email_sending
+      QUEUE_CONCURRENCY: 10
+      QUEUE_RETRY_ATTEMPTS: 3
+      QUEUE_RETRY_DELAY: 5000
+      SERVICE_FREEZE_THRESHOLD: 10
+      SERVICE_FREEZE_DURATION: 3600000
+      FIXED_SENDER_EMAIL: tony@glodamarket.fun
+      FIXED_SENDER_NAME: "EDM System Debug"
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: tony@glodamarket.fun
+      SMTP_PASS: your_app_password_here
+      ENGAGELAB_API_USER: api-glodamarket.fun
+      ENGAGELAB_API_KEY: 63b81ba85732f89bde0ac9643d7bb868
+    volumes:
+      - ./src/backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres-debug:
+        condition: service_healthy
+      redis-debug:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    command: npm run dev
+
+  # Redis服务
+  redis-debug:
+    image: redis:7-alpine
+    container_name: edm-redis-debug
+    ports:
+      - "6381:6379"
+    volumes:
+      - ./data/redis-debug:/data
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000
+
+networks:
+  edm-debug-network:
+    driver: bridge

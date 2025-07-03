@@ -1,0 +1,44 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# EDM项目 AI协作核心规则
+
+## 🎯 项目信息
+- **项目**: EDM邮件营销系统 (企业级)
+- **技术栈**: Node.js + React + PostgreSQL + Redis + Docker
+- **生产环境**: https://tkmail.fun
+
+## 📚 必读文档 (开发前)
+1. `README.md` - 项目概述 (2分钟)
+2. `PROJECT-GUIDE.md` - AI快速导航 (3分钟)
+
+## 🛠️ 核心规范
+- **提交格式**: `<type>(<scope>): <subject>`
+- **分支策略**: GitFlow (main/develop/feature/*)
+- **测试要求**: 覆盖率 ≥ 80%
+- **文档更新**: 代码变更必须同步文档
+
+## 📁 关键目录
+```
+src/backend/src/     # 后端：controllers, models, routes, services
+src/frontend/src/    # 前端：components, pages, services, types
+docs/               # 文档中心
+```
+
+## 🚀 常用命令
+```bash
+npm run dev         # 启动开发环境
+npm run health-check # 系统健康检查
+```
+
+## 🔑 测试信息
+- 用户名: admin / 密码: admin123456
+- Token: `dev-permanent-test-token-admin-2025`
+
+## ✅ 开发检查
+- [ ] 阅读相关文档
+- [ ] 代码通过检查
+- [ ] 测试用例通过
+- [ ] 文档已更新

@@ -1,0 +1,235 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库服务
+  postgres:
+    image: postgres:14
+    platform: linux/amd64
+    container_name: edm-postgres-prod
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amt_mail_system
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./db_init_scripts:/docker-entrypoint-initdb.d
+      - ./data/backups:/backups
+    restart: unless-stopped
+    networks:
+      - edm-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d amt_mail_system" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: edm-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    restart: unless-stopped
+    networks:
+      - edm-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000
+
+  # 后端API服务
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile.prod
+      no_cache: true
+    container_name: edm-backend-prod
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_KEY_PREFIX: "edm:"
+      JWT_SECRET: RXRmasE4X32fkDEwAbDiKzE7NyjPfWtC
+      JWT_EXPIRES_IN: 24h
+      DB_FORCE_SYNC: false
+      SCHEDULER_ENABLED: true
+      CORS_ORIGIN: "http://tkmail.fun,https://tkmail.fun,http://43.135.38.15"
+      SCHEDULER_INTERVAL: 1000
+      MAX_CONCURRENT_CAMPAIGNS: 5
+      EMAIL_SEND_RATE_LIMIT: 100
+      QUEUE_NAME: email_sending
+      QUEUE_CONCURRENCY: 10
+      QUEUE_RETRY_ATTEMPTS: 3
+      QUEUE_RETRY_DELAY: 5000
+      SERVICE_FREEZE_THRESHOLD: 10
+      SERVICE_FREEZE_DURATION: 3600000
+      FIXED_SENDER_EMAIL: tony@glodamarket.fun
+      FIXED_SENDER_NAME: "EDM System Production"
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: tony@glodamarket.fun
+      SMTP_PASS: your_app_password_here
+      ENGAGELAB_API_USER: api-glodamarket.fun
+      ENGAGELAB_API_KEY: 63b81ba85732f89bde0ac9643d7bb868
+      # 新增：追踪和图片配置
+      PUBLIC_DOMAIN: tkmail.fun
+      TRACKING_BASE_URL: https://tkmail.fun
+      WEBHOOK_BASE_URL: https://tkmail.fun
+      IMAGE_UPLOAD_PATH: /app/public/uploads/images
+      IMAGE_MAX_SIZE: 10485760 # 10MB
+      IMAGE_ALLOWED_TYPES: "jpg,jpeg,png,gif,webp"
+    volumes:
+      - ./src/backend:/app
+      - /app/node_modules
+      # 新增：上传文件持久化
+      - ./data/uploads:/app/public/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-network
+    command: npm run start
+
+  # 前端React服务 - 构建模式（默认）
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile.prod
+    container_name: edm-frontend-prod
+    environment:
+      REACT_APP_API_BASE_URL: /api
+      REACT_APP_TRACKING_BASE_URL: https://tkmail.fun
+      REACT_APP_IMAGE_BASE_URL: https://tkmail.fun/uploads
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+  # 前端React服务 - 挂载模式（快速更新，需要手动切换）
+  # 使用方法：
+  # 1. 停止默认前端：docker stop edm-frontend-prod && docker rm edm-frontend-prod
+  # 2. 启动挂载模式：docker-compose up -d frontend-mount
+  # 3. 以后更新只需要：cp -r build/* frontend-build/ && docker restart edm-frontend-mount
+  frontend-mount:
+    image: nginx:alpine
+    container_name: edm-frontend-mount
+    ports:
+      - "3000:80"
+    volumes:
+      # 挂载构建后的静态文件
+      - ./frontend-build:/usr/share/nginx/html:ro
+      # 挂载nginx配置
+      - ./deploy/nginx/frontend-mount.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - edm-network
+    profiles:
+      - mount-mode
+
+  # Nginx反向代理（升级配置）
+  nginx:
+    image: nginx:latest
+    container_name: edm-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # 新增：上传文件静态访问
+      - ./data/uploads:/var/www/uploads:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+  # 图片处理服务
+  image-service:
+    build:
+      context: ./services/image-service
+      dockerfile: Dockerfile.prod
+    container_name: edm-image-service
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      UPLOAD_PATH: /app/uploads
+      MAX_FILE_SIZE: 10485760
+      ALLOWED_TYPES: "jpg,jpeg,png,gif,webp"
+      THUMBNAIL_SIZES: "150x150,300x300,600x600"
+    volumes:
+      - ./data/uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+  # 追踪像素服务
+  tracking-service:
+    build:
+      context: ./services/tracking-service
+      dockerfile: Dockerfile.prod
+    container_name: edm-tracking-service
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+  # EngageLab Webhook接收服务
+  webhook-service:
+    build:
+      context: ./services/webhook-service
+      dockerfile: Dockerfile.prod
+    container_name: edm-webhook-service
+    ports:
+      - "8083:8083"
+    environment:
+      PORT: 8083
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-edm-webhook-secret-2025}
+      BACKEND_URL: http://backend:8080
+      ENGAGELAB_WEBHOOK_PATH: /webhook/engagelab
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+networks:
+  edm-network:
+    driver: bridge

@@ -1,0 +1,182 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# EDM业务场景专用规则
+
+## 🎯 核心理念
+**用户专注业务，AI处理技术**
+
+当用户描述业务需求时，你的职责是：
+1. **理解业务逻辑** - 深入理解用户的业务场景
+2. **自动化技术实现** - 按照项目规范自动生成代码
+3. **零干扰反馈** - 不询问技术细节，直接按规范实现
+
+## 📋 业务场景处理流程
+
+### 1. 用户输入业务需求时
+```
+用户说: "我需要一个邮件发送状态监控功能"
+
+你的处理步骤:
+1. 分析业务场景 → 邮件发送状态跟踪
+2. 自动设计数据结构 → email_status表
+3. 自动创建API接口 → /api/email/status
+4. 自动生成前端页面 → EmailStatusMonitor.tsx
+5. 自动运行验证脚本 → 确保符合规范
+6. 反馈给用户 → "✅ 邮件状态监控功能已实现"
+```
+
+### 2. 常见业务场景模板
+
+#### 📧 邮件相关功能
+- **发送邮件**: 自动创建controller、service、model
+- **邮件模板**: 自动创建模板管理系统
+- **发送统计**: 自动创建统计分析功能
+
+#### 👥 联系人管理
+- **联系人导入**: 自动创建批量导入功能
+- **标签管理**: 自动创建多级标签系统
+- **分组功能**: 自动创建动态分组
+
+#### 📊 数据分析
+- **发送报告**: 自动创建可视化报表
+- **效果分析**: 自动创建转化率分析
+- **用户行为**: 自动创建行为跟踪
+
+## 🔄 自动化技术处理
+
+### 数据库设计自动化
+```sql
+-- 用户说: "需要记录邮件打开次数"
+-- AI自动生成:
+CREATE TABLE email_open_logs (
+    id SERIAL PRIMARY KEY,
+    email_id INTEGER REFERENCES emails(id),
+    contact_id INTEGER REFERENCES contacts(id),
+    opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address INET,
+    user_agent TEXT
+);
+```
+
+### API接口自动化
+```javascript
+// 用户说: "需要查询邮件打开统计"
+// AI自动生成:
+exports.getEmailOpenStats = async (req, res, next) => {
+    try {
+        const { emailId } = req.params;
+        const stats = await EmailService.getOpenStats(emailId);
+        res.json({ success: true, data: stats });
+    } catch (error) {
+        next(error);
+    }
+};
+```
+
+### 前端组件自动化
+```typescript
+// 用户说: "需要显示邮件打开率图表"
+// AI自动生成:
+interface EmailStatsProps {
+    emailId: string;
+}
+
+const EmailOpenChart: React.FC<EmailStatsProps> = ({ emailId }) => {
+    const [stats, setStats] = useState<EmailStats | null>(null);
+    
+    useEffect(() => {
+        fetchEmailStats(emailId).then(setStats);
+    }, [emailId]);
+    
+    return (
+        <Card title="邮件打开统计">
+            <LineChart data={stats?.openData} />
+        </Card>
+    );
+};
+```
+
+## 🚫 禁止询问的技术细节
+
+### ❌ 不要问用户
+- "您希望使用什么数据库字段类型？"
+- "API接口路径您觉得怎么命名？"
+- "前端组件放在哪个目录？"
+- "是否需要添加错误处理？"
+- "测试用例要怎么写？"
+
+### ✅ 直接按规范实现
+- 数据库字段 → 按照项目规范自动选择
+- API路径 → 自动使用RESTful规范
+- 文件位置 → 自动按目录结构放置
+- 错误处理 → 自动添加try-catch
+- 测试用例 → 自动生成基础测试
+
+## 📝 业务需求理解模板
+
+### 用户输入分析
+```
+用户原话: "客户希望能看到邮件的详细发送情况"
+
+业务分析:
+- 核心需求: 邮件发送状态可视化
+- 用户角色: 客户(管理员)
+- 使用场景: 查看邮件营销效果
+- 期望结果: 直观的发送状态展示
+
+技术实现:
+- 数据层: email_logs表记录发送状态
+- 接口层: /api/email/{id}/status
+- 展示层: EmailStatusDashboard组件
+- 权限: 需要登录验证
+```
+
+## 🎯 成功标准
+
+### 用户体验目标
+- 用户只需描述业务需求
+- AI自动理解并实现功能
+- 代码自动符合项目规范
+- 功能立即可用可测试
+
+### 技术质量目标
+- 代码通过所有验证检查
+- API接口符合RESTful规范
+- 前端组件符合TypeScript规范
+- 数据库设计符合最佳实践
+
+## 💡 智能建议机制
+
+当用户描述业务需求时，自动提供增值建议：
+
+```
+用户: "需要邮件发送功能"
+
+AI回应:
+"✅ 邮件发送功能已实现，包含:
+📧 基础发送接口
+📊 发送状态跟踪  
+🔄 失败重试机制
+📈 发送统计报表
+
+💡 建议增加:
+🎯 个性化内容替换
+⏰ 定时发送功能
+📱 移动端推送通知
+
+是否需要实现这些增值功能？"
+```
+
+## 🔧 自动执行清单
+
+每次实现业务功能后，自动执行：
+1. ✅ 运行自动修正脚本
+2. ✅ 验证代码规范
+3. ✅ 生成API文档
+4. ✅ 创建基础测试
+5. ✅ 更新相关文档
+
+**记住**: 让用户专注业务创新，AI处理所有技术细节！

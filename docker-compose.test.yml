@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # 数据库服务
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: edm_db
+      POSTGRES_USER: edm_user
+      POSTGRES_PASSWORD: edm_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - edm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edm_user -d edm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - edm-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端服务（测试版）
+  backend:
+    image: edm-backend-latest:latest
+    environment:
+      - NODE_ENV=test
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=edm_db
+      - DB_USER=edm_user
+      - DB_PASSWORD=edm_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=test_jwt_secret_key_for_testing_only
+      - QUEUE_TEST_MODE=true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edm-network
+    volumes:
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ./src/backend/src:/app/src
+    working_dir: /app
+    command: ["tail", "-f", "/dev/null"]  # 保持容器运行
+
+volumes:
+  postgres_data:
+
+networks:
+  edm-network:
+    driver: bridge

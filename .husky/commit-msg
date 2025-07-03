@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "📝 验证提交信息格式..."
+
+# 读取提交信息
+commit_regex='^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: .{1,50}'
+
+if ! grep -qE "$commit_regex" "$1"; then
+  echo "❌ 提交信息格式不正确！"
+  echo ""
+  echo "正确格式: <type>(<scope>): <subject>"
+  echo ""
+  echo "类型说明:"
+  echo "  feat     - ✨ 新功能"
+  echo "  fix      - 🐛 修复问题"
+  echo "  docs     - 📚 文档更新"
+  echo "  style    - 💄 代码格式"
+  echo "  refactor - ♻️ 重构代码"
+  echo "  perf     - ⚡ 性能优化"
+  echo "  test     - ✅ 测试相关"
+  echo "  chore    - 🔧 构建/工具"
+  echo ""
+  echo "示例:"
+  echo "  feat(auth): 添加双因子认证功能"
+  echo "  fix(email): 修复模板渲染问题"
+  echo "  docs(api): 更新API文档"
+  echo ""
+  exit 1
+fi
+
+echo "✅ 提交信息格式正确！" 

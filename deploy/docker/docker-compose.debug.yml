@@ -1,0 +1,169 @@
+services:
+  # PostgreSQL数据库服务
+  postgres:
+    image: postgres:14
+    platform: linux/amd64
+    container_name: edm-postgres-debug
+    ports:
+      - "5433:5432" # 使用不同端口避免冲突
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amt_mail_system
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./db_init_scripts:/docker-entrypoint-initdb.d
+      - ./data/backups:/backups
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d amt_mail_system" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+
+  # 后端API服务 - 使用调试镜像
+  backend:
+    image: edm-backend-debug:latest # 使用我们构建的调试镜像
+    container_name: edm-backend-debug
+    ports:
+      - "3002:3000" # 使用不同端口避免冲突
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_KEY_PREFIX: "edm:"
+      JWT_SECRET: RXRmasE4X32fkDEwAbDiKzE7NyjPfWtC
+      JWT_EXPIRES_IN: 24h
+      DB_FORCE_SYNC: false
+      SCHEDULER_ENABLED: true
+      SCHEDULER_INTERVAL: 1000
+      MAX_CONCURRENT_CAMPAIGNS: 5
+      EMAIL_SEND_RATE_LIMIT: 100
+      QUEUE_NAME: email_sending
+      QUEUE_CONCURRENCY: 10
+      QUEUE_RETRY_ATTEMPTS: 3
+      QUEUE_RETRY_DELAY: 5000
+      SERVICE_FREEZE_THRESHOLD: 10
+      SERVICE_FREEZE_DURATION: 3600000
+      FIXED_SENDER_EMAIL: tony@glodamarket.fun
+      FIXED_SENDER_NAME: "EDM System Debug"
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: tony@glodamarket.fun
+      SMTP_PASS: your_app_password_here
+      ENGAGELAB_API_USER: api-glodamarket.fun
+      ENGAGELAB_API_KEY: 63b81ba85732f89bde0ac9643d7bb868
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    command: npm start
+
+  # 前端服务 - 调试版本
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: edm-frontend-debug
+    ports:
+      - "3003:3001" # 前端调试端口
+    environment:
+      NODE_ENV: development
+      REACT_APP_API_URL: http://localhost:3002
+      CHOKIDAR_USEPOLLING: true
+      WATCHPACK_POLLING: true
+      HOST: 0.0.0.0
+    volumes:
+      - ./src/frontend/src:/app/src
+      - ./src/frontend/public:/app/public
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    command: npm start
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: edm-redis-debug
+    ports:
+      - "6381:6379" # 使用不同端口避免冲突
+    volumes:
+      - ./data/redis:/data
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000
+
+  # EngageLab Webhook接收服务 - Debug环境
+  webhook-service:
+    build:
+      context: ../../services/webhook-service
+      dockerfile: Dockerfile
+    container_name: edm-webhook-service-debug
+    ports:
+      - "8084:8080" # 使用不同端口避免冲突
+    environment:
+      PORT: 8080
+      BACKEND_URL: http://backend:3000
+      WEBHOOK_SECRET: edm-webhook-debug-secret
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+
+  # 追踪像素服务 - Debug环境
+  tracking-service:
+    build:
+      context: ../../services/tracking-service
+      dockerfile: Dockerfile
+    container_name: edm-tracking-service-debug
+    ports:
+      - "8085:8081" # 使用不同端口避免冲突
+    environment:
+      PORT: 8081
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-debug-network
+
+networks:
+  edm-debug-network:
+    driver: bridge

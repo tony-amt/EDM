@@ -1,0 +1,87 @@
+services:
+  # PostgreSQL数据库服务
+  postgres:
+    image: postgres:14
+    platform: linux/amd64
+    container_name: edm-postgres-test
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amt_mail_system
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./db_init_scripts:/docker-entrypoint-initdb.d
+      - ./data/backups:/backups
+    restart: unless-stopped
+    networks:
+      - edm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d amt_mail_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: edm-redis-test
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    restart: unless-stopped
+    networks:
+      - edm-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000
+
+  # 后端API服务
+  backend:
+    build:
+      context: ../../src/backend
+      dockerfile: Dockerfile
+    container_name: edm-backend-test
+    ports:
+      - "8080:3000"
+    environment:
+      NODE_ENV: test
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_KEY_PREFIX: "edm:"
+      JWT_SECRET: RXRmasE4X32fkDEwAbDiKzE7NyjPfWtC
+      JWT_EXPIRES_IN: 24h
+      DB_FORCE_SYNC: false
+      SCHEDULER_ENABLED: true
+      CORS_ORIGIN: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080"
+    volumes:
+      - ../../src/backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-network
+    command: npm run dev
+
+networks:
+  edm-network:
+    driver: bridge

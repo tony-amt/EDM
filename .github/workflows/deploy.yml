@@ -1,0 +1,145 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install frontend dependencies
+      run: |
+        cd src/frontend
+        npm ci
+    
+    - name: Build frontend
+      env:
+        NODE_ENV: production
+        REACT_APP_API_BASE_URL: /api
+      run: |
+        cd src/frontend
+        npm run build
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p deploy-package
+        cp -r src/frontend/build deploy-package/frontend-build
+        cp -r src/backend deploy-package/backend
+        cp docker-compose.yml deploy-package/
+        tar -czf edm-${{ github.ref_name }}.tar.gz deploy-package/
+    
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          # 创建部署目录
+          mkdir -p /tmp/edm-deploy
+          
+          # 备份当前版本
+          if [ -d "/opt/edm" ]; then
+            sudo cp -r /opt/edm /tmp/edm-backup-$(date +%Y%m%d-%H%M%S)
+          fi
+          
+          echo "✅ 备份完成，准备部署版本: ${{ github.ref_name }}"
+    
+    - name: Upload deployment package
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        source: "edm-${{ github.ref_name }}.tar.gz"
+        target: "/tmp/edm-deploy/"
+    
+    - name: Execute deployment
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd /tmp/edm-deploy
+          
+          # 解压部署包
+          tar -xzf edm-${{ github.ref_name }}.tar.gz
+          
+          # 停止现有容器
+          docker stop edm-frontend-prod || true
+          docker rm edm-frontend-prod || true
+          
+          # 构建新的前端镜像
+          cd deploy-package
+          cat > Dockerfile.frontend << 'EOF'
+          FROM nginx:alpine
+          COPY frontend-build /usr/share/nginx/html
+          EXPOSE 80
+          CMD ["nginx", "-g", "daemon off;"]
+          EOF
+          
+          # 构建镜像
+          docker build -f Dockerfile.frontend -t edm-frontend:${{ github.ref_name }} .
+          
+          # 启动新容器
+          docker run -d \
+            --name edm-frontend-prod \
+            --network edm_edm-network \
+            --restart unless-stopped \
+            edm-frontend:${{ github.ref_name }}
+          
+          # 等待服务启动
+          sleep 30
+          
+          # 健康检查
+          echo "🔍 执行健康检查..."
+          for i in {1..5}; do
+            if curl -f -s https://tkmail.fun/api/health > /dev/null 2>&1; then
+              echo "✅ 健康检查通过"
+              break
+            elif [ $i -eq 5 ]; then
+              echo "❌ 健康检查失败，开始回滚"
+              docker stop edm-frontend-prod || true
+              docker rm edm-frontend-prod || true
+              # 这里可以添加回滚逻辑
+              exit 1
+            else
+              echo "⏳ 等待服务启动... ($i/5)"
+              sleep 10
+            fi
+          done
+          
+          # 清理临时文件
+          rm -rf /tmp/edm-deploy
+          
+          echo "🎉 部署完成！版本: ${{ github.ref_name }}"
+    
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "✅ 部署成功完成"
+        echo "版本: ${{ github.ref_name }}"
+        echo "时间: $(date)"
+        echo "URL: https://tkmail.fun"
+    
+    - name: Notify deployment failure
+      if: failure()
+      run: |
+        echo "❌ 部署失败"
+        echo "版本: ${{ github.ref_name }}"
+        echo "时间: $(date)"
+        echo "请检查日志并考虑手动回滚" 

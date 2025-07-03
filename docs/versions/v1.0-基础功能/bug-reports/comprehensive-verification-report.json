@@ -1,0 +1,142 @@
+{
+  "timestamp": "2025-06-04T06:42:07.073Z",
+  "summary": {
+    "total": 18,
+    "passed": 15,
+    "failed": 3,
+    "successRate": 83.3
+  },
+  "details": [
+    {
+      "timestamp": "2025/6/4 14:41:56",
+      "type": "info",
+      "message": "开始测试服务健康状态..."
+    },
+    {
+      "timestamp": "2025/6/4 14:41:56",
+      "type": "success",
+      "message": "后端API健康检查 - 通过 状态码: 200"
+    },
+    {
+      "timestamp": "2025/6/4 14:41:56",
+      "type": "error",
+      "message": "前端服务访问 - 失败 错误: connect ECONNREFUSED ::1:3001"
+    },
+    {
+      "timestamp": "2025/6/4 14:41:58",
+      "type": "info",
+      "message": "测试管理员登录..."
+    },
+    {
+      "timestamp": "2025/6/4 14:41:58",
+      "type": "success",
+      "message": "管理员登录 - 通过 Token获取成功"
+    },
+    {
+      "timestamp": "2025/6/4 14:41:59",
+      "type": "info",
+      "message": "测试联系人CRUD功能..."
+    },
+    {
+      "timestamp": "2025/6/4 14:41:59",
+      "type": "success",
+      "message": "联系人创建API - 通过 状态码: 201, 联系人ID: fdfdd2e2-56d9-498c-a8e1-ff84d144c030"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:00",
+      "type": "success",
+      "message": "联系人列表同步 - 通过 新创建联系人已出现在列表中"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:00",
+      "type": "success",
+      "message": "联系人详情获取 - 通过 详情数据正确"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:01",
+      "type": "info",
+      "message": "测试模板CRUD功能..."
+    },
+    {
+      "timestamp": "2025/6/4 14:42:01",
+      "type": "success",
+      "message": "模板列表获取 - 通过 找到4个现有模板"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:01",
+      "type": "success",
+      "message": "使用现有模板 - 通过 模板ID: b1d99b87-5a54-44c4-96de-72cc8d32958e"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:02",
+      "type": "info",
+      "message": "测试模板集功能..."
+    },
+    {
+      "timestamp": "2025/6/4 14:42:02",
+      "type": "success",
+      "message": "模板集API可访问 - 通过 状态码: 200, 响应格式: 正确"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:03",
+      "type": "info",
+      "message": "测试标签API..."
+    },
+    {
+      "timestamp": "2025/6/4 14:42:03",
+      "type": "success",
+      "message": "标签API可访问 - 通过 状态码: 200, 数据格式: 正确"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:04",
+      "type": "info",
+      "message": "测试邮件发送功能..."
+    },
+    {
+      "timestamp": "2025/6/4 14:42:04",
+      "type": "success",
+      "message": "使用现有邮件测试联系人 - 通过 联系人ID: fdfdd2e2-56d9-498c-a8e1-ff84d144c030"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:05",
+      "type": "success",
+      "message": "创建测试标签 - 通过 标签ID: be9b50d8-78e7-4157-877c-85c3f26ecbb2"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:05",
+      "type": "success",
+      "message": "联系人标签关联 - 通过 标签已关联到邮件测试联系人"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:05",
+      "type": "success",
+      "message": "创建模板集 - 通过 模板集ID: 939f4c80-fdde-4980-981b-8ed14ec2cce5"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:05",
+      "type": "success",
+      "message": "创建测试活动 - 通过 活动ID: 13d311b9-c410-4ae2-ae54-cb1ced75a18b"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:05",
+      "type": "success",
+      "message": "创建邮件任务 - 通过 任务ID: f4e447c9-6097-4dd5-8052-9e9129bc8168"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:05",
+      "type": "error",
+      "message": "邮件发送测试 - 失败 错误: Request failed with status code 404"
+    },
+    {
+      "timestamp": "2025/6/4 14:42:07",
+      "type": "info",
+      "message": "清理测试数据..."
+    },
+    {
+      "timestamp": "2025/6/4 14:42:07",
+      "type": "error",
+      "message": "基础测试数据清理 - 失败 清理失败: Request failed with status code 500"
+    }
+  ],
+  "recommendation": "存在失败测试，需要进一步修复"
+}

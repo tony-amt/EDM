@@ -1,0 +1,157 @@
+user nginx;
+worker_processes auto;
+pid /var/run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # 上游服务配置
+    upstream frontend {
+        server edm-frontend-prod:80;
+    }
+    
+    upstream backend {
+        server edm-backend-prod:8080;
+    }
+
+    upstream image-service {
+        server image-service:8082;
+    }
+
+    upstream tracking-service {
+        server tracking-service:8081;
+    }
+
+    upstream webhook-service {
+        server webhook-service:8083;
+    }
+
+    server {
+        listen 80;
+        server_name localhost tkmail.fun 43.135.38.15;
+
+        # 前端静态资源
+        location / {
+            proxy_pass http://frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # WebSocket支持
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+
+        # API路由
+        location /api/ {
+            proxy_pass http://backend/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # API超时配置
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+
+        # 健康检查路由
+        location /health {
+            proxy_pass http://backend/health;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # WebSocket路由
+        location /ws {
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # 新增：EngageLab Webhook路由
+        location /webhook/ {
+            proxy_pass http://webhook-service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Webhook特殊配置
+            proxy_buffering off;
+            proxy_request_buffering off;
+            client_max_body_size 10m;
+        }
+
+        # 新增：追踪像素路由
+        location /track/ {
+            proxy_pass http://tracking-service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 追踪像素缓存配置
+            expires 1d;
+            add_header Cache-Control "public, no-transform";
+        }
+
+        # 新增：图片上传API路由
+        location /image-api/ {
+            proxy_pass http://image-service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 文件上传配置
+            client_max_body_size 10m;
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+
+        # 新增：静态文件访问（上传的图片等）
+        location /uploads/ {
+            alias /var/www/uploads/;
+            expires 30d;
+            add_header Cache-Control "public, no-transform";
+            
+            # 图片格式支持
+            location ~* \.(jpg|jpeg|png|gif|webp)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+        }
+
+        # 安全配置
+        location ~ /\. {
+            deny all;
+        }
+
+        # 错误页面配置
+        error_page 404 /404.html;
+        error_page 500 502 503 504 /50x.html;
+    }
+} 

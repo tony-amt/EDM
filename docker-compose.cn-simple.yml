@@ -1,0 +1,89 @@
+services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:14
+    container_name: edm-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amt_mail_system
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./db_init_scripts:/docker-entrypoint-initdb.d
+      - ./data/backups:/backups
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - edm-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d amt_mail_system" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # 后端服务
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile.simple
+    container_name: edm-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      # 数据库配置
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: amt_mail_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      # Redis配置
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # JWT配置
+      JWT_SECRET: your-secret-key-change-in-production
+      # 邮件服务API配置
+      ENGAGELAB_API_URL: https://api.engagelab.cn/v1
+      ENGAGELAB_API_USER: api-glodamarket.fun
+      ENGAGELAB_API_KEY: 63b81ba85732f89bde0ac9643d7bb868
+    volumes:
+      - ./src/backend:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: edm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    restart: unless-stopped
+    networks:
+      - edm-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  edm-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

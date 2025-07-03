@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-06-09T15:06:37.123Z",
+  "duration": "16.92",
+  "total": 3,
+  "passed": 0,
+  "failed": 3,
+  "results": [
+    {
+      "file": "v2-senders.test.js",
+      "success": false,
+      "code": 1
+    },
+    {
+      "file": "v2-email-services.test.js",
+      "success": false,
+      "code": 1
+    },
+    {
+      "file": "v2-user-quota.test.js",
+      "success": false,
+      "code": 1
+    }
+  ]
+}

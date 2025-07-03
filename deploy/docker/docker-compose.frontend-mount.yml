@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: nginx:alpine
+    container_name: edm-frontend-mount
+    ports:
+      - "3000:80"
+    volumes:
+      # 挂载构建后的静态文件
+      - /opt/edm/frontend-build:/usr/share/nginx/html:ro
+      # 挂载nginx配置
+      - /opt/edm/deploy/nginx/frontend-mount.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - edm-network
+
+networks:
+  edm-network:
+    external: true

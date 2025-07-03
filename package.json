@@ -1,0 +1,72 @@
+{
+  "name": "edm-email-marketing-system",
+  "version": "1.1.0",
+  "description": "企业级邮件直销(EDM)系统 - 支持批量邮件发送、智能追踪、数据分析的完整解决方案",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "docker-compose restart",
+    "build": "docker-compose build",
+    "logs": "docker-compose logs -f",
+    "dev": "docker-compose -f docker-compose.yml -f docker-compose.debug.yml up -d",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd src/backend && npm test",
+    "test:frontend": "cd src/frontend && npm test",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd src/backend && npm run lint",
+    "lint:frontend": "cd src/frontend && npm run lint",
+    "deploy": "./deploy/deploy.sh",
+    "backup": "./scripts/backup.sh",
+    "health-check": "node scripts/scheduler-health-check-prod.js",
+    "validate": "./scripts/validate-project-standards.sh",
+    "clean": "./scripts/docker-cleanup.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tony-amt/EDM.git"
+  },
+  "keywords": [
+    "email-marketing",
+    "edm",
+    "email-automation",
+    "bulk-email",
+    "email-tracking",
+    "nodejs",
+    "react",
+    "typescript",
+    "postgresql",
+    "redis",
+    "docker"
+  ],
+  "author": "Tony AMT <dev@tkmail.fun>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tony-amt/EDM/issues"
+  },
+  "homepage": "https://github.com/tony-amt/EDM#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "workspaces": [
+    "src/frontend",
+    "src/backend"
+  ],
+  "devDependencies": {
+    "husky": "^8.0.0",
+    "@commitlint/cli": "^17.0.0",
+    "@commitlint/config-conventional": "^17.0.0"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  }
+}

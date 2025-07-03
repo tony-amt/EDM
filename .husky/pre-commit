@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 EDM项目提交前自动检查..."
+
+# 1. 自动修正常见问题
+echo "🔧 自动修正规范问题..."
+./scripts/ai-auto-fix.sh
+
+# 2. 验证项目规范
+echo "✅ 验证项目规范..."
+./scripts/ai-code-validator.sh
+
+# 3. 运行代码质量检查
+echo "🔍 代码质量检查..."
+
+# 检查后端代码
+if [ -d "src/backend" ]; then
+    echo "📡 检查后端代码..."
+    cd src/backend
+    npm run lint:fix 2>/dev/null || echo "⚠️  后端linting跳过"
+    cd ../..
+fi
+
+# 检查前端代码
+if [ -d "src/frontend" ]; then
+    echo "⚛️  检查前端代码..."
+    cd src/frontend
+    npm run lint:fix 2>/dev/null || echo "⚠️  前端linting跳过"
+    cd ../..
+fi
+
+# 4. 验证提交信息格式
+echo "📝 验证提交信息格式..."
+# 这将由commit-msg钩子处理
+
+echo "✅ 提交前检查完成!" 

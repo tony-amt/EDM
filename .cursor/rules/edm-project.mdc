@@ -1,0 +1,68 @@
+---
+description: 当需要详细的EDM项目开发规范、目录结构说明、问题排查指南、测试账号信息或开发检查清单时，请参考此规则。适用于功能开发、代码重构、问题调试、项目配置等场景。
+globs: 
+alwaysApply: false
+---
+# EDM项目 Cursor AI 协作规则
+
+## 🎯 项目基本信息
+- **项目**: EDM邮件营销系统 (企业级邮件直销平台)
+- **技术栈**: Node.js + React + PostgreSQL + Redis + Docker
+- **生产环境**: https://tkmail.fun
+
+## 📚 必读文档 (开始前)
+1. `README.md` - 项目概述 (2分钟)
+2. `PROJECT-GUIDE.md` - AI快速导航 (3分钟) 
+3. `docs/02-specifications/SPEC-008-项目管理与团队协作规范.md` - 开发规范
+
+## 🛠️ 核心开发规范
+- **提交格式**: `<type>(<scope>): <subject>` (如: `feat(auth): add login validation`)
+- **分支策略**: GitFlow (main/develop/feature/*)
+- **测试要求**: 新功能必须有测试，覆盖率 ≥ 80%
+- **文档更新**: 代码变更必须同步更新文档
+
+## 📁 目录结构
+```
+src/backend/src/        # 后端：controllers, models, routes, services
+src/frontend/src/       # 前端：components, pages, services, types
+docs/                   # 文档中心
+tools/                  # 开发工具
+deploy/                 # 部署配置
+config/                 # 配置文件
+```
+
+## 🚀 常用命令
+```bash
+npm run dev             # 启动开发环境
+npm run health-check    # 系统健康检查
+docker-compose logs -f  # 查看服务日志
+npm run validate       # 项目规范验证
+```
+
+## 🔍 问题排查
+1. 容器启动失败 → `npm run health-check`
+2. 前端404 → 检查 `deploy/nginx/`
+3. API失败 → `docker-compose logs backend`
+4. 数据库连接失败 → 检查 `config/` 环境变量
+
+## 🔑 测试账号
+- 用户名: admin / 密码: admin123456
+- 测试Token: `dev-permanent-test-token-admin-2025`
+
+## ✅ 开发检查清单
+- [ ] 阅读相关文档和规范
+- [ ] 了解现有代码结构
+- [ ] 代码通过ESLint检查
+- [ ] 测试用例通过
+- [ ] 文档已更新
+- [ ] 提交信息符合规范
+
+## 🎯 质量原则
+- 用户价值第一
+- 代码易维护扩展
+- 遵循项目规范
+- 考虑边界情况和错误处理
+
+---
+
+**Agent Requested描述**: 当需要详细的EDM项目开发规范、目录结构说明、问题排查指南、测试账号信息或开发检查清单时，请参考此规则。适用于功能开发、代码重构、问题调试、项目配置等场景。
